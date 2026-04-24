@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+
+# LaTeX intermediates
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# Python bytecode
+scripts/__pycache__/
+*.pyc
+
+# ------------------------------------------------------------
+# Personal data — exclude when pushing to a public repo.
+# If this is a private repo (see PRIVACY.md Path B), you can
+# comment out this block.
+# ------------------------------------------------------------
+raw/resumes/
+raw/code/*.md
+!raw/code/_TEMPLATE.md
+jobs/
+drafts/
+approved/
+edits/
+
+# Personal style profile — example phrases reference specific projects
+# (e.g. 3D micro-CT datasets, 70%--90% metrics). Kept local only.
+preferences.md
+
+# Personal LaTeX template override — kept local only, has real PII baked in.
+# The public `latex-template.tex` uses placeholders; the skill prefers this
+# `.local.tex` when it exists so locally-generated drafts have real values.
+.claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex
+.agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex

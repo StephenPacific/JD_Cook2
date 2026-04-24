@@ -1,0 +1,296 @@
+%-------------------------
+% Resume in Latex
+% Author : Vaishanth
+% License : MIT
+%------------------------
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[letterpaper,12pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\definecolor{nameblue}{RGB}{33,56,129}
+\usepackage[hidelinks]{hyperref}
+\usepackage{array}
+\urlstyle{same}
+\hypersetup{
+    colorlinks=true,       
+    linkcolor=black,        
+    urlcolor=[RGB]{0, 51, 153}, 
+    citecolor=black,
+    breaklinks=true
+}
+\def\UrlBreaks{\do\/\do-} 
+\newcommand{\JobURL}{https://github.com/username/project-one}
+\newcommand{\Cloud}{https://github.com/username/project-two}
+\newcommand{\Link}{https://github.com/username/project-three}
+\newcommand{\LimitOrderBookURL}{https://github.com/username/project-four}
+\newcommand{\linkedin}{https://www.linkedin.com/in/your-handle/}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{fontawesome5}
+\usepackage{multicol}
+\usepackage{graphicx}%\setmainfont{Times New Roman}
+\setlength{\multicolsep}{-3.0pt}
+\setlength{\columnsep}{-1pt}
+\input{glyphtounicode}
+
+\RequirePackage{tikz}
+\RequirePackage{xcolor}
+
+\definecolor{cvblue}{HTML}{0E5484}
+\definecolor{black}{HTML}{130810}
+\definecolor{darkcolor}{HTML}{0F4539}
+\definecolor{cvgreen}{HTML}{3BD80D}
+\definecolor{taggreen}{HTML}{00E278}
+\definecolor{SlateGrey}{HTML}{2E2E2E}
+\definecolor{LightGrey}{HTML}{666666}
+\colorlet{name}{black}
+\colorlet{tagline}{darkcolor}
+\colorlet{heading}{darkcolor}
+\colorlet{headingrule}{cvblue}
+\colorlet{accent}{darkcolor}
+\colorlet{emphasis}{SlateGrey}
+\colorlet{body}{LightGrey}
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% \usepackage[T1]{fontenc}
+% \usepackage[T1]{fontenc}
+% \usepackage{cochineal}
+% \usepackage{fourier}
+
+% \usepackage{fontspec}
+% \usepackage{polyglossia}
+% \setmainlanguage{german}
+% \setmainfont{Times New Roman}
+
+% serif
+\usepackage{CormorantGaramond}
+\usepackage{charter}
+
+% \pagestyle{fancy}
+% \fancyhf{}  % clear all header and footer fields
+% \fancyfoot{}
+% \renewcommand{\headrulewidth}{0pt}
+% \renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1.19in}
+\addtolength{\topmargin}{-.7in}
+\addtolength{\textheight}{1.4in}
+\urlstyle{same}
+
+\definecolor{airforceblue}{rgb}{0.36, 0.54, 0.66}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large\bfseries
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+
+
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-1pt}}
+  }
+}
+
+\newcommand{\classesList}[4]{
+    \item\small{
+        {#1 #2 #3 #4 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{@{}p{0.72\textwidth}@{\extracolsep{\fill}}>{\raggedleft\arraybackslash}p{0.22\textwidth}@{}}
+      \textbf{\large #1} & \textbf{\small #2} \\
+      \textit{\large #3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSingleSubheading}[2]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{@{}p{0.72\textwidth}@{\extracolsep{\fill}}>{\raggedleft\arraybackslash}p{0.22\textwidth}@{}}
+      \textbf{\large #1} & \textbf{\small #2} \\
+    \end{tabular*}\vspace{-5pt}
+}
+
+
+% \newcommand{\resumeSingleSubheading}[4]{
+%   \vspace{-2pt}\item
+%     \begin{tabular*}{1.0\textwidth}[t]{l@{\extracolsep{\fill}}r}
+%       \textbf{\large#1} & \textbf{\small #2} \\
+      
+%     \end{tabular*}\vspace{-7pt}
+% }
+
+\newcommand{\resumeSingleSubheading}[2]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{@{}p{0.72\textwidth}@{\extracolsep{\fill}}>{\raggedleft\arraybackslash}p{0.22\textwidth}@{}}
+      \textbf{\normalsize #1} & \textbf{\small #2} \\
+    \end{tabular*}\vspace{-5pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{1.001\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & \textbf{\small #2}\\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemi{$\vcenter{\hbox{\tiny$\bullet$}}$}
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.1in]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\newcommand\sbullet[1][.5]{\mathbin{\vcenter{\hbox{\scalebox{#1}{$\bullet$}}}}}
+
+%-------------------------------------------\usepackage{fontspec}
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+%----------HEADING----------
+
+
+\begin{center}
+    {\color{nameblue}\huge Your Name} \\ \vspace{8pt}
+    \href{}{\color{black}{City, State  \textbar{}}}
+    \href{}{\color{black}{+1 (000) 000 0000 \textbar{}}}
+    % \small{-}
+    \href{}{ \color{black}{your.email@example.com }}
+    % \href{\linkedin}{\textcolor{nameblue}{\texttt{linkedin/your-handle}}}
+    % \small{-}
+    % \href{[url to github profile]}{ \color{black}{github.com/username}} ~
+
+    \vspace{-1pt}
+\end{center}
+%-----------EDUCATION-----------
+\section{\color{nameblue} \Large EDUCATION}
+\resumeSubHeadingListStart
+
+\resumeSubheading
+  {UNSW Sydney}{Sep 2024 -- Sep 2026}
+  {Master of Information Technology (Artificial Intelligence)}{Sydney, Australia}
+
+\resumeSubheading
+  {Shanghai Polytechnic University}{Jun 2021 -- Jul 2023}
+  {Bachelor of Intelligence Science and Technology}{Shanghai, China}
+
+\resumeSubHeadingListEnd
+\vspace{-10pt}
+
+
+ %-----------EXPERIENCE-----------
+\section{\color{nameblue}\Large EXPERIENCE}
+   \resumeSubHeadingListStart
+     \resumeSubheading
+      {\large Casual Software Engineer}{May 2025  -- Present} 
+      {UNSW Sydney}{Sydney, Australia}
+      \resumeItemListStart
+        \resumeItem{\normalsize{Led end-to-end architecture and delivery of a desktop and web platform using \textbf{Python}, \textbf{PySide6}, \textbf{Flask}, \textbf{React} and \textbf{MongoDB}, enabling reliable processing of 100 GB+ 3D imaging datasets under strict memory and I/O constraints.}}
+        \resumeItem{\normalsize{Reduced crashes and OOM incidents by 70\%--90\% by building a \textbf{PySide6} viewer with on-demand loading and bounded caching for smooth exploration of 100 GB+ imaging files.}}
+        \resumeItem{\normalsize{Improved large-file ingestion reliability by building backend services in \textbf{Python} and deploying workloads with \textbf{Docker} to a self-hosted GPU server.}}
+        
+      \resumeItemListEnd  
+      
+    \resumeSubheading
+      {\large Academic Volunteer}{March 2025 -- Present} 
+      {UNSW Sydney}{Sydney, Australia}
+      \resumeItemListStart
+       \resumeItem{\normalsize{Contributed to a Retrieval-Augmented Generation system using \textbf{Python}, focusing on system architecture, retrieval pipelines, and core algorithms.}}
+        \vspace{2pt}
+        \resumeItem{\normalsize{Supported testing, validation, and migration of a production protocol implementation from \textbf{C} to \textbf{Rust}, improving maintainability while preserving correctness and performance stability.}}
+        \vspace{2pt}
+        
+          
+      \resumeItemListEnd  
+
+    \resumeSubheading
+      {\large Software Test Engineer Intern}{Apr 2023  -- Jun 2023} 
+      {Capital Information Development Co., Ltd. }{Shanghai, China}
+      \resumeItemListStart
+        \resumeItem{\normalsize{Validated network environments for reliability and performance, and authored requirement-based test plans and cases to improve module coverage and release confidence.}}
+        
+      \resumeItemListEnd  
+
+  \resumeSubHeadingListEnd
+\vspace{-10pt}
+
+
+
+ %-----------PROJECTS-----------
+\section{\color{nameblue}\Large PROJECTS}
+\resumeSubHeadingListStart
+
+\resumeSingleSubheading
+  {Link-State Routing Protocol \href{\Link}{\small [GitHub]}}{Jan 2024 -- Mar 2024}
+    \resumeItemListStart
+      \resumeItem{\normalsize{Built a link-state routing protocol over unreliable \textbf{UDP}, maintaining a consistent network topology through flooding, versioned state dissemination, and soft-state failure detection.}}
+      \resumeItem{\normalsize{Designed timestamp-based ordering to tolerate message loss, duplication, and reordering, and applied Dijkstra's algorithm for fast route recomputation under dynamic topology changes.}}
+    \resumeItemListEnd
+\resumeSingleSubheading
+  {C++ Limit Order Book \href{\LimitOrderBookURL}{\small[GitHub]}}{Jan 2026 -- Present}
+\resumeItemListStart
+  \resumeItem{\normalsize{Implemented a foundational \textbf{limit order book} in \textbf{C++}, supporting order insertion, cancellation, and matching under price-time priority.}}
+  \resumeItem{\normalsize{Designed data structures to maintain bid/ask levels and enable efficient updates, exploring trade-offs between simplicity and performance.}}
+\resumeItemListEnd
+
+ 
+
+%-----------PROGRAMMING SKILLS-----------
+\section{\color{nameblue} \Large TECHNICAL SKILLS}
+ \begin{itemize}[leftmargin=0in, label={}]
+    \small{\item{
+     \textbf{\normalsize{Programming Languages: }}{\normalsize{Python, C++, Rust, HTML/CSS, JavaScript
+}} \\
+      \vspace{4pt}
+      
+     \textbf{\normalsize{Technologies \& Tools: }}{\normalsize{MySQL, PostgreSQL, MongoDB, Bash, Git, Docker}} \\
+    \vspace{4pt}
+
+      
+     % \textbf{\normalsize{Other:}}{ \normalsize{RESTful API, Agile/Scrum Methodologies, Unit Testing, Observability, Github Actions}}
+
+     }}
+ \end{itemize}
+ \vspace{-5pt}
+
+\end{document}
