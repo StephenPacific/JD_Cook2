@@ -1,5 +1,29 @@
 # JDcook
 
+## Import a JD
+
+The resume workflow reads `jobs/<job>.md`. You can still create that file by
+hand, but the preferred path is to import the JD first.
+
+If the JD is open in your browser, select the JD text, copy it, then run:
+
+```sh
+make import-job JOB=agentic-ai-engineer FROM=clipboard
+```
+
+For public pages, URL imports are available:
+
+```sh
+make import-job JOB=agentic-ai-engineer URL="https://..." MODE=http
+make import-job JOB=agentic-ai-engineer URL="https://..." MODE=js
+```
+
+If `MODE` is omitted, the importer uses `auto`: try HTTP first, then JS if the
+page looks too sparse. `MODE=js` is for JS-heavy pages and requires Playwright.
+It does not log in, solve CAPTCHA, click Apply, or bypass access controls.
+Imports write `jobs/<job>.md` and a private snapshot under
+`jobs/_sources/<job>/`.
+
 ## Local PDF Preview
 
 Use the local LaTeX toolchain for preview instead of copying `.tex` into Overleaf.

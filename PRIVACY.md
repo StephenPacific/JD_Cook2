@@ -14,6 +14,7 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `.claude/skills/.../references/latex-template.tex` | Your name / phone / email baked in the header | ⚠️ Sanitize OR gitignore |
 | `.agents/skills/...` | Mirror of above | Same rules |
 | `Makefile` | Build orchestration | ✅ Yes |
+| `scripts/import_job.py` | JD import helper; no personal data baked into source | ✅ Yes |
 | `scripts/cycle.py` | Cycle helper | ✅ Yes |
 | `scripts/__pycache__/` | Python bytecode | ❌ Never (gitignore) |
 | `README.md`, `USAGE.md`, `PRIVACY.md` | Generic documentation | ✅ Yes |
@@ -21,6 +22,7 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `raw/resumes/*.pdf` | Your personal resume, PII throughout | ❌ Never |
 | `raw/code/*.md` (filled) | Real project descriptions, supervisor names, mentor identity, grades | ❌ Never |
 | `jobs/*.md` | JD text (may be company IP) + links to real companies | ❌ Never |
+| `jobs/_sources/<slug>/*` | Clipboard/web snapshots, rendered text, screenshots, URL metadata | ❌ Never |
 | `drafts/*.tex` | Personal resume body + PII header | ❌ Never |
 | `approved/<slug>/*` | Final submitted resumes | ❌ Never |
 | `edits/<slug>/*` | AI draft + final + diff + note (full PII) | ❌ Never |
@@ -46,6 +48,7 @@ Share the reusable tooling; keep all personal data private.
         latex-template.tex        ← sanitize header to placeholders first (see below)
 .agents/skills/...                (same content, mirror)
 Makefile
+scripts/import_job.py
 scripts/cycle.py
 README.md
 USAGE.md
@@ -61,6 +64,7 @@ raw/resumes/
 raw/code/*.md
 !raw/code/_TEMPLATE.md
 jobs/
+# includes jobs/_sources/<slug>/ import snapshots
 drafts/
 approved/
 edits/
@@ -68,6 +72,7 @@ preferences.md                    ← optional; see "On preferences.md" below
 
 # Build
 build/
+.DS_Store
 *.aux
 *.fdb_latexmk
 *.fls

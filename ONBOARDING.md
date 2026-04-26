@@ -31,7 +31,8 @@ Expected time: **30–45 minutes** the first time (most of it is writing your ow
 | **Homebrew** (macOS) | Installs BasicTeX | https://brew.sh |
 | **BasicTeX** | LaTeX compiler (`pdflatex`, `latexmk`) | `brew install --cask basictex` |
 | **LaTeX packages** | Template dependencies | `sudo tlmgr install latexmk collection-latexrecommended collection-fontsrecommended` |
-| **Python 3** (3.8+) | Runs `scripts/cycle.py`; standard library only | Usually preinstalled on macOS |
+| **Python 3** (3.10+) | Runs `scripts/import_job.py` and `scripts/cycle.py`; clipboard/http imports use the standard library only | Usually preinstalled on macOS |
+| **Playwright** | Optional; only needed for `make import-job ... MODE=js` | `python3 -m pip install playwright && python3 -m playwright install chromium` |
 | **VS Code** + **LaTeX Workshop** extension | Live PDF preview while editing | Recommended, not strictly required |
 
 ### If you're on Linux
@@ -47,11 +48,20 @@ WSL2 + the Linux path above works. Native Windows LaTeX (MiKTeX) should also wor
 ## Step 1 — Clone
 
 ```bash
-git clone https://github.com/<owner>/jdcook.git
-cd jdcook
+git clone https://github.com/StephenPacific/JD_Cook2.git
+cd JD_Cook2
 ```
 
 Everything in this guide assumes your working directory is the repo root.
+
+Create the local-only working directories that are intentionally absent from the public repo:
+
+```bash
+mkdir -p raw/resumes raw/code jobs drafts approved edits
+touch preferences.md
+```
+
+These paths are gitignored because they will contain your resume, JD history, generated drafts, and personal style rules.
 
 ---
 
@@ -95,13 +105,16 @@ If you're using Codex instead, see [Codex-specific notes](#codex-specific-notes)
 
 ---
 
-## Step 4 — Personalise the LaTeX template
+## Step 4 — Personalise the local LaTeX template
 
-This repo ships `latex-template.tex` with placeholder header info. Replace the placeholders with your real details in **both** mirror copies:
+This repo ships `latex-template.tex` with placeholder header info so the public repo stays safe to share. Keep that tracked file sanitized, and create local overrides for your real details:
 
-```
-.claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex
-.agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex
+```bash
+cp .claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex \
+   .claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex
+
+cp .agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex \
+   .agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex
 ```
 
 Find the `\begin{center} ... \end{center}` block (near line ~193) and replace:
@@ -116,14 +129,16 @@ Find the `\begin{center} ... \end{center}` block (near line ~193) and replace:
 \end{center}
 ```
 
-With your real name, city, phone, email. Also update the `\newcommand{\XxxURL}{...}` lines near line ~30 to point to your real project repos, and add/remove entries as needed.
+With your real name, city, phone, email in the `.local.tex` files. Also update the `\newcommand{\XxxURL}{...}` lines near line ~30 to point to your real project repos, and add/remove entries as needed.
 
 **Tip:** edit one file, then copy it over to the mirror to stay consistent:
 
 ```bash
-cp .claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex \
-   .agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.tex
+cp .claude/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex \
+   .agents/skills/drafting-resume-from-confirmed-assets/references/latex-template.local.tex
 ```
+
+The skill prefers `latex-template.local.tex` when it exists, then falls back to the placeholder `latex-template.tex`. Both `.local.tex` files are ignored by git.
 
 ---
 
@@ -134,6 +149,7 @@ The skill produces evidence-grounded resumes, which means **every bullet it gene
 ### 5a. Drop your current resume
 
 ```bash
+mkdir -p raw/resumes
 cp ~/Downloads/my-resume.pdf raw/resumes/
 ```
 
@@ -169,15 +185,27 @@ ls raw/code/     # should have multiple project .md files (plus _TEMPLATE.md)
 
 ## Step 6 — Your first cycle
 
-### 6a. Save a JD
+### 6a. Import a JD
+
+The workflow reads one stable file: `jobs/<slug>.md`. The easiest path is clipboard import:
 
 ```bash
-# Create jobs/<slug>.md and paste the JD into it
-echo "# Role Title at Company\n\n## About this role\n..." > jobs/my-first-jd.md
-# Or use your editor to create it; plain text is fine
+# Open the JD in your browser, select the JD text, copy it, then:
+make import-job JOB=my-first-jd FROM=clipboard
 ```
 
-Keep the JD text verbatim. The skill reads it to do gap analysis.
+This writes `jobs/my-first-jd.md` and keeps a private source snapshot in `jobs/_sources/my-first-jd/`.
+
+For public pages, URL import is also available:
+
+```bash
+make import-job JOB=my-first-jd URL="https://..." MODE=http
+make import-job JOB=my-first-jd URL="https://..." MODE=js
+```
+
+If `MODE` is omitted, the importer uses `auto`: try HTTP first, then JS if the page looks too sparse. Use `MODE=http` for normal static pages. Use `MODE=js` for JS-heavy pages; it requires Playwright and only renders public pages. It does not log in, solve CAPTCHA, click Apply, or bypass access controls.
+
+Manual creation is still fine: create `jobs/my-first-jd.md` in your editor and paste the JD text verbatim. The skill reads that file to do gap analysis.
 
 ### 6b. Start Claude Code and invoke the skill
 

@@ -1,6 +1,9 @@
 # Build artifacts
 build/
 
+# macOS metadata
+.DS_Store
+
 # LaTeX intermediates
 *.aux
 *.fdb_latexmk

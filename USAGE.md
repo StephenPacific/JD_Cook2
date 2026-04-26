@@ -25,7 +25,8 @@ One skill is live: `drafting-resume-from-confirmed-assets`. It:
 - **Claude Code** (or a Codex-compatible runtime that reads `.agents/skills/`)
 - **BasicTeX** (via Homebrew: `brew install --cask basictex`)
 - **Extra LaTeX packages**: `sudo tlmgr install collection-latexrecommended collection-fontsrecommended`
-- **Python 3** for `scripts/cycle.py` (standard library only, no pip)
+- **Python 3** for `scripts/import_job.py` and `scripts/cycle.py` (clipboard/http imports use the standard library only)
+- **Playwright** only if you want `MODE=js` URL imports: `python3 -m pip install playwright && python3 -m playwright install chromium`
 - **VS Code** with the **LaTeX Workshop** extension (recommended for live preview)
 
 ---
@@ -39,11 +40,13 @@ raw/                                                      evidence base
   ├── resumes/                                              past resumes (PDF)
   └── code/                                                 repo/project notes (md)
 jobs/                                                     one file per JD you apply to
+  └── _sources/<slug>/                                      import snapshots (clipboard/url)
 drafts/                                                   AI-generated + your edits
 approved/<slug>/                                          immutable submission record
 edits/<slug>/                                             cycle learning materials
 preferences.md                                            accumulated style rules (P### / L###)
 Makefile                                                  cycle orchestration
+scripts/import_job.py                                     clipboard/url -> jobs/<slug>.md
 scripts/cycle.py                                          begin / check / approve / learn
 build/                                                    compiled PDFs (gitignored)
 ```
@@ -55,7 +58,23 @@ build/                                                    compiled PDFs (gitigno
 ### Phase 1 — Generate the first draft
 
 1. Pick a **slug** (lowercase, hyphens): `stripe-backend`, `atlassian-fullstack`, etc.
-2. Save the JD text as `jobs/<slug>.md`.
+2. Import or save the JD as `jobs/<slug>.md`.
+
+   Recommended, if you already have the JD open in your browser:
+
+   ```bash
+   # Select the JD text in the browser, copy it, then:
+   make import-job JOB=<slug> FROM=clipboard
+   ```
+
+   URL imports are also supported for public pages:
+
+   ```bash
+   make import-job JOB=<slug> URL="https://..." MODE=http
+   make import-job JOB=<slug> URL="https://..." MODE=js
+   ```
+
+   If `MODE` is omitted, the importer uses `auto`: try HTTP first, then JS if the page looks too sparse. `MODE=js` uses Playwright for JS-heavy pages. It does not log in, solve CAPTCHA, click Apply, or bypass access controls. If a site blocks automated rendering, use `FROM=clipboard`.
 3. In Claude Code, ask it to draft the resume:
 
    > "Use the `drafting-resume-from-confirmed-assets` skill to draft a resume for `jobs/<slug>.md`."
@@ -100,6 +119,8 @@ make learn JOB=<slug>
 
 | Target | What it does |
 |---|---|
+| `make import-job JOB=<slug> FROM=clipboard` | Reads your clipboard and writes `jobs/<slug>.md` plus `jobs/_sources/<slug>/`. |
+| `make import-job JOB=<slug> URL="..." MODE=http/js` | Imports a public JD URL into `jobs/<slug>.md`; omitting `MODE` uses `auto`, and `MODE=js` requires Playwright. |
 | `make draft JOB=<slug>` | Compile `drafts/<slug>.tex` → `build/pdf/drafts/<slug>.pdf`. Used by `check`. |
 | `make approved JOB=<slug>` | Compile `approved/<slug>/<slug>.tex` → `build/pdf/approved/<slug>.pdf`. |
 | `make begin JOB=<slug>` | Snapshot `drafts/<slug>.tex` to `edits/<slug>/ai-draft.tex`. Refuses overwrite; `FORCE=1` to override. |
