@@ -8,12 +8,14 @@ A skill-based, evidence-grounded workflow for drafting JD-tailored resumes, with
 
 Three layers:
 
-- **Skills** (`.claude/skills/` and `.agents/skills/`) — the rules the agent follows when drafting
+- **Skill** (`.claude/skills/` and `.agents/skills/`) — the workflow + rules the agent follows when drafting. Rules are split in two:
+  - `references/canonical-rules.md` — universal resume-engineering rules (`C###`), safe to ship to any user
+  - `preferences.md` (project root) — personal style preferences and carve-outs (`P###` / `L###`), gitignored under Path A
 - **Raw** (`raw/`) — your facts (past resumes, project notes); every bullet in a draft must trace back to here
-- **Memory** (`approved/`, `edits/`, `preferences.md`) — what got submitted, how it differed from the AI draft, and the accumulated style rules that apply next time
+- **Memory** (`approved/`, `edits/`, `preferences.md`) — what got submitted, how it differed from the AI draft, and the accumulated personal style rules that apply next time
 
 One skill is live: `drafting-resume-from-confirmed-assets`. It:
-1. Reads `preferences.md` and applies learned style rules.
+1. Reads `references/canonical-rules.md` (universal) and `preferences.md` (personal); applies both.
 2. Reads all files under `raw/`.
 3. Reads the JD you specify.
 4. Produces `drafts/<slug>.tex` with a `% src:` comment after every bullet, TODO comments for unmet JD requirements, and no hallucinated claims.
@@ -124,15 +126,28 @@ make learn JOB=<slug>
 | `make draft JOB=<slug>` | Compile `drafts/<slug>.tex` → `build/pdf/drafts/<slug>.pdf`. Used by `check`. |
 | `make approved JOB=<slug>` | Compile `approved/<slug>/<slug>.tex` → `build/pdf/approved/<slug>.pdf`. |
 | `make begin JOB=<slug>` | Snapshot `drafts/<slug>.tex` to `edits/<slug>/ai-draft.tex`. Refuses overwrite; `FORCE=1` to override. |
-| `make check JOB=<slug>` | Compiles + runs 8 validators via `scripts/cycle.py`. Fails on any violation. |
-| `make approve JOB=<slug>` | Runs `check` first (dependency), then copies `.tex` + `.pdf` into `approved/<slug>/` and generates `metadata.md`. |
+| `make check JOB=<slug>` | Compiles + runs validators via `scripts/cycle.py`. Fails on any violation. |
+| `make approve JOB=<slug>` | Runs `check` first, then copies the internal audit `.tex` + `.pdf` into `approved/<slug>/`, auto-generates `<slug>.public.tex`, and writes `metadata.md`. |
+| `make export JOB=<slug>` | Generates `approved/<slug>/<slug>.public.tex` from the internal approved `.tex` by stripping `% src:` / `% TODO:` comments. Use `FORCE=1` to regenerate. |
 | `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + `note.md` template. |
 
 **`FORCE=1`** (env or `--force` flag for `cycle.py`) lets any step overwrite an existing artifact. Use deliberately.
 
+### Approved vs public LaTeX
+
+`approved/<slug>/<slug>.tex` is the internal audit copy. It intentionally keeps
+`% src:` and `% TODO:` comments so the evidence chain remains inspectable.
+
+`approved/<slug>/<slug>.public.tex` is the share-safe source copy. It is
+generated automatically by `make approve` and can be regenerated with
+`FORCE=1 make export JOB=<slug>`.
+
+If someone asks for the LaTeX source, share `.public.tex`, not the internal
+audit `.tex`.
+
 ---
 
-## What the 8 `check` validators enforce
+## What `check` validators enforce
 
 From `scripts/cycle.py`:
 
@@ -144,6 +159,7 @@ From `scripts/cycle.py`:
 6. `\end{document}` exists
 7. PDF page count is exactly 1 (parsed from the latexmk log)
 8. At least one `% TODO:` gap comment is present (the JD-gap block must be visible before approval)
+9. If `approved/<slug>/<slug>.public.tex` exists, it must not contain `% src:` or `% TODO:` internal audit comments
 
 ---
 
@@ -158,17 +174,25 @@ From `scripts/cycle.py`:
 
 ---
 
-## Preferences model
+## Rules model: dual layer (canonical + personal)
 
-Each rule in `preferences.md` has:
+The skill applies BOTH `references/canonical-rules.md` AND `preferences.md`. They serve different purposes:
 
-- **ID** — `P###` for content, `L###` for layout
-- **Rule** — the operational instruction
-- **Prefer / Avoid** — concrete positive and negative examples
-- **Why** — the observation that produced it
-- **Source** — the `edits/<slug>/note.md` it came from
+| File | ID prefix | Scope | Distribution |
+|---|---|---|---|
+| `references/canonical-rules.md` | `C###` | Universal — works for any user, stack, JD | Open-source ship |
+| `preferences.md` | `P###` / `L###` | Personal — your style, your carve-outs | Gitignored under Path A |
 
-Rules are **promoted retrospectively**, never added speculatively. If two cycles disagree on a rule, that's a signal — refine the condition, demote, or delete.
+A rule in `preferences.md` may be **purely personal** (your aesthetic/voice) OR a **carve-out over canonical** (a tighter / narrower variant of a `C###` rule). Carve-outs reference the parent canonical rule explicitly.
+
+Each rule has:
+
+- **ID** — `C###` (canonical), `P###` (content preference), or `L###` (layout preference)
+- **Why** — the principle / observation behind the rule
+- **How to apply** — operational instruction
+- **Example from cycle** (preferences only) — concrete cycle that produced it
+
+Rules are **promoted retrospectively** from `edits/<slug>/note.md`, never added speculatively. To promote from `preferences.md` to `canonical-rules.md`, a rule must pass the 4-criterion test (stack-agnostic, domain-agnostic, seniority-agnostic, example-defrostable) — see `references/canonical-rules.md` for the protocol. If two cycles disagree on a rule, that's a signal — refine the condition, demote, or delete.
 
 ---
 

@@ -39,7 +39,7 @@ All sections: `\section{\color{nameblue}\Large SECTIONNAME}` (all caps)
   {\large Role}{Start -- End (or Present)}
   {Company}{City, Country}
   \resumeItemListStart
-    \resumeItem{\normalsize{bullet with \textbf{tech} names bolded.}}
+    \resumeItem{\normalsize{bullet with restrained \textbf{tech} emphasis only when central.}}
     % src: raw/path
   \resumeItemListEnd
 ```
@@ -54,7 +54,7 @@ All sections: `\section{\color{nameblue}\Large SECTIONNAME}` (all caps)
 \resumeSingleSubheading
   {Project Name \href{\XxxURL}{\small [GitHub]}}{Start -- End}
   \resumeItemListStart
-    \resumeItem{\normalsize{bullet with \textbf{tech}.}}
+    \resumeItem{\normalsize{bullet with one or two central \textbf{tech} names if useful.}}
     % src: raw/path
   \resumeItemListEnd
 ```
@@ -80,9 +80,10 @@ Template default is 2 categories (Languages, Technologies & Tools). A 3rd catego
 
 ## LaTeX conventions (required)
 
-**Bold tech names inline:** every tech mention in a bullet wrapped in `\textbf{...}`.
-- ✅ `using \textbf{Python}, \textbf{Flask}`
-- ❌ `using Python, Flask`
+**Restrained bold tech inline:** bold only 1–3 JD-critical technologies that are central to the bullet's claim. Do not bold every tool mention, and do not create long bolded tool chains.
+- ✅ `orchestrated long-running jobs with \textbf{Python} subprocesses`
+- ✅ `built a \textbf{PySide6} desktop workflow for large image datasets`
+- ❌ `using \textbf{React}, \textbf{Flask}, \textbf{MongoDB}, \textbf{Docker}, \textbf{Linux}, and \textbf{Git}`
 
 **Escaping in body text:**
 | Char | Escaped |

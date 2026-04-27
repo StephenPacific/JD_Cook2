@@ -237,7 +237,7 @@ Edit until you're happy. When you want to validate:
 make check JOB=my-first-jd
 ```
 
-This auto-compiles and runs 8 validators (bullet count ≤ 10, every bullet has a `% src:` comment, no `\mid`, PDF is 1 page, TODO block present, etc.). Any failure prints a clear `FAIL: ...` message and exits non-zero.
+This auto-compiles and runs validators (bullet count ≤ 10, every bullet has a `% src:` comment, no `\mid`, PDF is 1 page, TODO block present, public export stripped when present, etc.). Any failure prints a clear `FAIL: ...` message and exits non-zero.
 
 Fix the failures in the editor, re-run `make check`, repeat until it says `Check passed`.
 
@@ -248,7 +248,13 @@ make approve JOB=my-first-jd
 make learn JOB=my-first-jd
 ```
 
-`approve` re-runs `check` as a dependency (so you can't approve a broken draft), then copies `.tex` + `.pdf` into `approved/my-first-jd/` and auto-generates a `metadata.md`.
+`approve` re-runs `check` as a dependency (so you can't approve a broken draft), then copies the internal audit `.tex` + `.pdf` into `approved/my-first-jd/`, auto-generates `my-first-jd.public.tex`, and writes `metadata.md`.
+
+Inside `approved/my-first-jd/`:
+
+- `my-first-jd.tex` keeps `% src:` / `% TODO:` comments for your audit trail.
+- `my-first-jd.public.tex` strips those comments and is the version to share if anyone asks for LaTeX source.
+- `my-first-jd.pdf` is the normal application PDF.
 
 `learn` compares `edits/.../ai-draft.tex` against the approved version, produces a unified `diff.patch`, and drops a `note.md` template with TODO sections for you to fill in.
 

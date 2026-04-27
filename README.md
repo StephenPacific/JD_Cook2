@@ -65,6 +65,11 @@ When the resume is ready to approve:
 make approve JOB=agentic-ai-engineer
 ```
 
+Approval stores two LaTeX versions:
+
+- `approved/<job>/<job>.tex` — internal audit copy, keeps `% src:` / `% TODO:`
+- `approved/<job>/<job>.public.tex` — share-safe source, strips `% src:` / `% TODO:`
+
 Then generate learning materials for the memory loop:
 
 ```sh
@@ -73,6 +78,8 @@ make learn JOB=agentic-ai-engineer
 
 `make approve` refuses to overwrite an existing `approved/<job>/` directory.
 Use `FORCE=1` only for an intentional replacement.
+If you later edit the internal approved `.tex`, regenerate the public source with
+`FORCE=1 make export JOB=<job>`.
 
 `make learn` does not update `preferences.md` automatically. It creates a diff
 and note template under `edits/<job>/` so preference promotion stays reviewed.

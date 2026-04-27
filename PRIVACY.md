@@ -10,8 +10,9 @@ This file maps every directory to a **share status** and gives two publishing pa
 
 | Path | Contains | Push to public repo? |
 |---|---|---|
-| `.claude/skills/...` (SKILL.md, schema, bullet-rules, anti-patterns) | Rules / methodology | ✅ Yes |
-| `.claude/skills/.../references/latex-template.tex` | Your name / phone / email baked in the header | ⚠️ Sanitize OR gitignore |
+| `.claude/skills/...` (SKILL.md, schema, bullet-rules, content-strategy, anti-patterns, **canonical-rules**) | Rules / methodology — universal layer | ✅ Yes |
+| `.claude/skills/.../references/latex-template.tex` | Header placeholders + body placeholder bullets (sanitized) | ✅ Yes (after Sprint 1.1 sanitization) |
+| `.claude/skills/.../references/latex-template.local.tex` | Your name / phone / email + your real body content | ❌ Never (gitignored) |
 | `.agents/skills/...` | Mirror of above | Same rules |
 | `Makefile` | Build orchestration | ✅ Yes |
 | `scripts/import_job.py` | JD import helper; no personal data baked into source | ✅ Yes |
@@ -24,9 +25,9 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `jobs/*.md` | JD text (may be company IP) + links to real companies | ❌ Never |
 | `jobs/_sources/<slug>/*` | Clipboard/web snapshots, rendered text, screenshots, URL metadata | ❌ Never |
 | `drafts/*.tex` | Personal resume body + PII header | ❌ Never |
-| `approved/<slug>/*` | Final submitted resumes | ❌ Never |
+| `approved/<slug>/*` | Final submitted resumes, internal audit `.tex`, share-safe `.public.tex` | ❌ Never |
 | `edits/<slug>/*` | AI draft + final + diff + note (full PII) | ❌ Never |
-| `preferences.md` | Style rules; examples may reference specific projects | ⚠️ Depends — see below |
+| `preferences.md` | **Personal** style preferences + carve-outs over canonical rules. Examples reference your real cycles. | ❌ Never (Path A) — gitignored. Universal rules already live in `canonical-rules.md`. |
 | `build/` | Compiled PDFs and intermediate files | ❌ Never (gitignored) |
 
 ---
@@ -44,8 +45,10 @@ Share the reusable tooling; keep all personal data private.
     references/
         resume-schema.md
         bullet-rules.md
+        content-strategy.md
+        canonical-rules.md        ← universal C### rules (Sprint 1 added)
         anti-patterns.md
-        latex-template.tex        ← sanitize header to placeholders first (see below)
+        latex-template.tex        ← header + body now all placeholders (Sprint 1.1)
 .agents/skills/...                (same content, mirror)
 Makefile
 scripts/import_job.py
@@ -111,16 +114,14 @@ Push everything to a **private** GitHub repo. You get full version history of yo
 
 ## On `preferences.md`
 
-The rules themselves (P001–P007, L001) are generic and safe to share. But the **example phrases** embedded in them may leak project details:
+After Sprint 1, all universal rules were promoted to `references/canonical-rules.md` (the open-source layer). Only personal preferences and carve-outs remain in `preferences.md` — they intentionally include cycle-specific examples that reference real projects, datasets, percentages, or university-partner names.
 
-- Specific dataset descriptions — may tie to a real lab / facility
-- University-partner phrases like `"<school>--<company>"` — reveal a specific industry partnership
-- Concrete percentage metrics — identify a particular project outcome
+`preferences.md` is **gitignored under Path A**. New users who fork JDcook get the universal `canonical-rules.md` and an empty `preferences.md` to grow their own personal layer.
 
-If you're going Path A (public), either:
+If you ever want to share your `preferences.md` (e.g., as a teaching example), either:
 
-- Sanitize example phrases in `preferences.md` to generic placeholders (`"large dataset"`, `"partner organisation"`, `"measurable reduction"`), or
-- Keep `preferences.md` gitignored and ship a minimal `preferences.example.md` with 1–2 neutral sample rules
+- Sanitize example phrases to generic placeholders (`"large dataset"`, `"partner organisation"`, `"measurable reduction"`), or
+- Ship a minimal `preferences.example.md` with 1–2 neutral sample rules and keep your real `preferences.md` gitignored.
 
 ---
 

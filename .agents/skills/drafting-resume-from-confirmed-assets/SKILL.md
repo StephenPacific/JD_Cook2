@@ -16,12 +16,14 @@ description: Use when drafting or revising a resume targeted at a specific
 
 ## Required reading before drafting
 1. **Always:** the LaTeX template — prefer `references/latex-template.local.tex` if it exists (has real name/phone/email/LinkedIn/GitHub URLs); otherwise fall back to `references/latex-template.tex` (placeholder version, safe for public repo). Copy preamble verbatim; use its custom commands and section order.
-2. **Always:** `references/resume-schema.md` — section order, entry formats, LaTeX conventions (escaping, bold tech, src, TODO).
+2. **Always:** `references/resume-schema.md` — section order, entry formats, LaTeX conventions (escaping, restrained emphasis, src, TODO).
 3. **Always:** `references/bullet-rules.md` — bullet shape, verbs, evidence-to-verb mapping.
-4. **Always:** `preferences.md` at project root — accumulated user style rules.
-5. **Always:** all files under `raw/` — evidence base. PDFs read via Read tool.
-6. If any exist: up to 3 most recent files in `approved/` — structural examples only, NEVER fact sources.
-7. If unsure: `references/anti-patterns.md`.
+4. **Always:** `references/content-strategy.md` — JD analysis, evidence selection, engineering depth, impact, and project-framing rules.
+5. **Always:** `references/canonical-rules.md` — universal resume-engineering rules (`C###`) that apply to any user / stack / JD.
+6. **Always:** `preferences.md` at project root — personal style preferences and carve-outs over canonical rules.
+7. **Always:** all files under `raw/` — evidence base. PDFs read via Read tool.
+8. If any exist: up to 3 most recent files in `approved/` — structural examples only, NEVER fact sources.
+9. If unsure: `references/anti-patterns.md`.
 
 ## Inputs
 - JD: `jobs/<slug>.md` or inline text
@@ -29,6 +31,15 @@ description: Use when drafting or revising a resume targeted at a specific
 - Approved examples: up to 3 most recent under `approved/`
 - Preferences: `preferences.md`
 - Template: `references/latex-template.local.tex` if present, else `references/latex-template.tex`
+
+## Drafting workflow
+1. Parse the JD into role family, must-have requirements, nice-to-have signals, hidden priorities, and seniority/ownership expectations.
+2. Inventory raw evidence and map each strong evidence item to JD signals before writing bullets.
+3. Choose a resume strategy: strongest work/research evidence first; projects only when they add distinct JD-relevant signal.
+4. Allocate the 10-bullet budget intentionally, then draft bullets that show engineering problem, technical action, and supported result.
+5. Add TODO gaps for JD requirements with no raw support.
+6. Strip student-flavored, tool-flavored, and keyword-heavy phrasing unless the JD explicitly makes it relevant.
+7. Self-review against schema, bullet rules, content strategy, and anti-patterns before writing the final `.tex`.
 
 ## Rules (strict)
 1. Every factual claim (metric, ownership, duration, tech, title, company) must be traceable to a specific location in `raw/`. Not in raw → not in draft.
@@ -41,6 +52,11 @@ description: Use when drafting or revising a resume targeted at a specific
 8. **About template body:** the body inside `references/latex-template.tex` is a structural example (equivalent to `approved/` entries). Use it for ordering, tone, phrasing. **Never source facts to it.** If a bullet appears in both template body and `raw/`, source to `raw/`. Dates, numbers, and scope claims in the template body may be stale — always defer to `raw/`.
 9. **Page budget (hard):** Output MUST fit on **1 compiled page**. To preserve this, total `\resumeItem` count across all sections ≤ **10**. If projected to overflow: (a) drop the least-JD-relevant PROJECTS entry first, (b) if still overflowing, shorten older Experience roles to 1–2 bullets, (c) if still overflowing, drop PROJECTS entirely. **Never** shrink font, margins, or spacing to "cheat" the page — template sizing is calibrated.
 10. **Projects ordering by JD relevance:** The section order (Header → EDUCATION → EXPERIENCE → PROJECTS → TECHNICAL SKILLS) is fixed. But **within PROJECTS**, order entries by **JD relevance** (most relevant first), not by chronology or alphabet. Include as many PROJECTS entries as fit the bullet budget — 0 is fine if Experience already covers the JD; 2–3 is fine when each adds distinct JD-relevant signal. Each project entry: ≤ 3 bullets.
+11. **Content quality:** A bullet should not merely list tools. It must make an evidence-supported case for engineering credibility: what problem/constraint was handled, what technical action was taken, and what result or validated scope followed.
+12. **No student flavor:** Do not mention grades, "full marks", assignments, class/course labels, or "student project" unless the JD explicitly values academic results or the raw evidence has no better framing. If coursework is used, frame the system, complexity, tests, CI, or validation — not the grade.
+13. **No tool/product flavor:** Do not lead with a niche or internal product category as the main selling point unless the JD explicitly values that domain. Frame the transferable engineering system instead: evidence-grounded document pipeline, validation rules, traceability, LaTeX generation, reproducibility, large-data handling.
+14. **No keyword stuffing:** Bold only the 1–3 most JD-critical technologies in a bullet. Do not bold every tech mention. Do not write any tech-stack chain longer than 3 bolded items in one bullet (e.g., `\textbf{X}, \textbf{Y}, \textbf{Z}, \textbf{W}, \textbf{V}`) unless each is essential to the engineering claim and the bullet still explains a problem/result.
+15. **One bullet, one workstream/source:** Do not combine unrelated projects, roles, or evidence sources into one bullet with semicolons or "also". Default to one raw project source per bullet. Multiple `% src:` lines are allowed only when they support the same coherent workstream (for example, a project note plus resume PDF for the same role), never to stitch separate projects together.
 
 ## Self-check before returning
 - [ ] Every `\resumeItem{...}` has a `% src: ...` on the immediately following line
@@ -48,7 +64,13 @@ description: Use when drafting or revising a resume targeted at a specific
 - [ ] Total `\resumeItem` count ≤ 10 (page-budget proxy)
 - [ ] PROJECTS entries ordered by JD relevance (most relevant first), not chronology
 - [ ] Section order: Header → EDUCATION → EXPERIENCE → PROJECTS → TECHNICAL SKILLS
-- [ ] Every tech mention inside bullets wrapped in `\textbf{...}`
+- [ ] Each bullet passes the content-strategy review: problem/constraint, technical action, and supported result/scope are clear
+- [ ] The strongest production/work/research evidence appears before weaker coursework or early-stage personal tooling
+- [ ] Course or early-stage projects are framed as such unless raw evidence proves real users, deployment, or production use
+- [ ] No student-flavored phrasing such as "full marks", assignment/class framing, or grade-first claims unless explicitly JD-relevant
+- [ ] Niche / internal product domain language is reframed as the transferable engineering system unless the JD's domain matches
+- [ ] Bold emphasis is restrained: max 1–3 core tech names per bullet, no long bolded tool chains, and every bold term supports the claim
+- [ ] No bullet merges unrelated workstreams or raw project sources with semicolons or "also"; each bullet has one coherent evidence thesis
 - [ ] `%`, `_`, `&`, `#` properly escaped in body text
 - [ ] Date ranges use `--`; ongoing uses `Present`
 - [ ] Every `\newcommand{\XxxURL}` referenced in body is defined in preamble
@@ -66,3 +88,29 @@ See `references/anti-patterns.md`. LaTeX-specific additions:
 ## Output
 - File: `drafts/<job-slug>.tex`
 - Print one-line summary: (a) bullet count, (b) TODO count, (c) uncovered JD requirements, (d) reminder to compile in VSCode with LaTeX Workshop to preview PDF.
+- Print a **preflight checklist** confirming which canonical and personal rules were honored during drafting, e.g.:
+  ```
+  Preflight applied — Canonical (references/canonical-rules.md):
+  - C001 ownership verbs precise (evidence-matched)
+  - C002 layer decomposition (where applicable)
+  - C003 user-facing outcome verbs
+  - C004 internal/public LaTeX separation
+  - C005 student-flavor reframed as engineering validation
+  - C006 incomplete-project risk-checked
+  - C007 weak-metric reframing considered
+  - C008 transferable system framing applied where applicable
+  - C009 evidence ranked by JD signal
+  - C010 one workstream/source per bullet
+  - C011 bold high-signal items only
+  - C012 no keyword stuffing
+  - C013 skills JD-filtered
+
+  Preflight applied — Personal (preferences.md):
+  - P002/P008 bold carve-outs (≤1–2 bold/bullet, specific bolded items per user taste)
+  - P003 active framing (where applicable)
+  - P004 leadership 3-stage arc (if leadership bullet exists)
+  - P005 platform/SRE vocab (if infrastructure work)
+  - L001 sparse-entry merge consideration
+  - L002 ≤3 short skill rows
+  ```
+  This makes the drafting workflow auditable, not just generative — every draft self-reports which rules were honored. Add new lines as `references/canonical-rules.md` and `preferences.md` grow.
