@@ -81,7 +81,7 @@ build/                                                    compiled PDFs (gitigno
 
    > "Use the `drafting-resume-from-confirmed-assets` skill to draft a resume for `jobs/<slug>.md`."
 
-   The skill reads `preferences.md` automatically and applies learned rules. Output lands in `drafts/<slug>.tex`.
+   The skill reads canonical rules plus `preferences.md` automatically and applies learned rules. Output lands in `drafts/<slug>.tex`.
 
 ### Phase 2 — Cycle (Makefile)
 
@@ -95,7 +95,7 @@ make begin JOB=<slug>
 # Validate whenever you want (auto-compiles first):
 make check JOB=<slug>
 
-# When everything passes, archive:
+# When everything passes, approve:
 make approve JOB=<slug>
 
 # Generate diff.patch and note.md template for learning:
@@ -104,16 +104,85 @@ make learn JOB=<slug>
 
 **Order matters.** `make begin` must run **before** you edit — otherwise the snapshot captures your edits, not the AI's original, and the diff becomes meaningless.
 
-### Phase 3 — Promote preferences
+### Phase 3 — Triage learning into rules
 
 1. Open `edits/<slug>/note.md` and fill the sections:
    - **What Changed** — summarise your substantive edits
-   - **Preference Candidates** — rules that may generalise
+   - **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
+   - **Personal Preference Candidates** — your own voice, visual style, or carve-outs over canonical rules
    - **JD-Specific Choices** — this JD only, don't promote
    - **Do Not Promote** — tempting but unsafe generalisations
-   - **Promote to `preferences.md`** — final call
-2. Manually add accepted rules to `preferences.md` using the `P###` (content) or `L###` (layout) convention.
-3. Next time the skill runs, it reads the new rules automatically.
+   - **Manual Promotion Checklist** — final human review before changing rule files
+2. Manually add accepted universal rules to the skill's `references/canonical-rules.md` using `C###` IDs.
+3. Manually add accepted personal rules to `preferences.md` using `P###` (content) or `L###` (layout) IDs.
+4. Next time the skill runs, it reads both rule layers automatically.
+
+---
+
+## Job lifecycle and sample classes
+
+The workflow has two separate concepts:
+
+- **Job lifecycle** — how far a single slug has moved through the pipeline.
+- **Sample class** — whether an approved artifact should be treated as a current official example, a legacy learning source, a validation sample, or archive.
+
+### Job lifecycle states
+
+These states are derived from files on disk, except `checked`, which is an action that must be run now:
+
+| State | Meaning |
+|---|---|
+| `imported` | `jobs/<slug>.md` exists. |
+| `drafted` | `drafts/<slug>.tex` exists. |
+| `begun` | `edits/<slug>/ai-draft.tex` exists. This must be created before user edits. |
+| `checked` | `make check JOB=<slug>` can pass now. This is not persisted; do not treat it as historical proof. |
+| `approved` | `approved/<slug>/` exists with the approved artifact set. |
+| `learned` | `edits/<slug>/note.md` exists. |
+
+### Approved sample classes
+
+Approved samples are classified with deterministic tie-breaks:
+
+1. `approved/_validation/<slug>/` is `validation-sample`, regardless of metadata.
+2. Any other `approved/_*/<slug>/` path is `archive`, regardless of metadata.
+3. A top-level approved directory with exact metadata `Status: validation-sample` is `validation-sample`.
+4. A top-level approved directory with exact metadata `Status: legacy` is `legacy`.
+5. A top-level approved directory with exact metadata `Status: archive` is `archive`.
+6. A top-level approved directory with exact metadata `Status: official`, or no `Status` field, is `official`.
+
+Allowed `Status` values are exact enum values only:
+
+```text
+official | legacy | validation-sample | archive
+```
+
+Do not put explanatory text in `Status`. Use `Status notes` for prose such as "pre-current internal/public audit format" or "flow test only".
+
+### Metadata ownership
+
+`make approve` and `make learn` may write metadata. On intentional replacement (`FORCE=1`), generated fields may be refreshed, but user-editable fields should be preserved when possible.
+
+Machine-managed fields:
+
+- `Internal audit LaTeX`
+- `Public LaTeX`
+- `JD source`
+- `Submission date`
+- `Compiled PDF`
+
+User-editable / preserve-on-replace fields:
+
+- `Status`
+- `Status notes`
+- `Company`
+- `Result`
+- `Posting URL`
+- `Job ID`
+- `Applications close`
+- `Cycle notes`
+- `Legacy note`
+
+`Cycle notes` is initialized or refreshed by `make learn`, but `make approve FORCE=1` should not erase an existing human-curated note path.
 
 ---
 
@@ -129,7 +198,9 @@ make learn JOB=<slug>
 | `make check JOB=<slug>` | Compiles + runs validators via `scripts/cycle.py`. Fails on any violation. |
 | `make approve JOB=<slug>` | Runs `check` first, then copies the internal audit `.tex` + `.pdf` into `approved/<slug>/`, auto-generates `<slug>.public.tex`, and writes `metadata.md`. |
 | `make export JOB=<slug>` | Generates `approved/<slug>/<slug>.public.tex` from the internal approved `.tex` by stripping `% src:` / `% TODO:` comments. Use `FORCE=1` to regenerate. |
-| `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + `note.md` template. |
+| `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + `note.md` template. Refuses non-official samples unless `FORCE=1`. |
+| `make status JOB=<slug>` | Reports lifecycle state, sample class, metadata issues, and non-persisted `checked` guidance for one slug. |
+| `make check-all` | Compiles and validates every current `official` approved artifact; skips `legacy`, `validation-sample`, and `archive`. |
 
 **`FORCE=1`** (env or `--force` flag for `cycle.py`) lets any step overwrite an existing artifact. Use deliberately.
 
@@ -147,11 +218,30 @@ audit `.tex`.
 
 ---
 
+## Bullet shape contract
+
+Every resume bullet must use this exact shape:
+
+```latex
+\resumeItem{\normalsize{...content...}}
+% src: <path-in-raw>
+```
+
+The `\normalsize{...}` wrapper is part of the machine-readable contract, not just
+styling. `scripts/cycle.py check` uses `\resumeItem{\normalsize` as the bullet
+recognition anchor; removing the wrapper makes bullets invisible to the
+validator and can create false passes with zero detectable resume bullets.
+
+---
+
 ## What `check` validators enforce
 
 From `scripts/cycle.py`:
 
-1. ≤ 10 resume bullets (Rule #9 — page-budget proxy)
+`make check` applies these validators to the current draft. `make check-all`
+reuses the same validators against compiled `official` approved artifacts.
+
+1. 1–10 detectable resume bullets (Rule #9 — page-budget proxy; zero bullets fails because it usually means the bullet shape contract was broken)
 2. Every `\resumeItem{\normalsize...}` is followed on the next line by `% src:`
 3. No `% src:` points to `approved/` (would create circular references)
 4. No `% src:` points to `latex-template.tex` (Rule #8 — template body is a format reference, not a fact source)
@@ -169,18 +259,18 @@ From `scripts/cycle.py`:
 - **Mixing `\mid` and `\textbar{}`** — `\mid` is math-mode only; in text it raises *"Missing $ inserted"*. Validator 5 catches this.
 - **Adding a bullet without `% src:`** — validator 2 fails. Either add the source comment or delete the bullet.
 - **Bullets too long** — each bullet > ~25 words pushes rendering to 2 lines; 10 bullets × 2 lines overflows the 1-page budget. Validator 7 catches the overflow.
-- **Promoting a JD-specific choice to `preferences.md`** — pollutes the style profile. If only one cycle has confirmed a pattern, keep it in the candidate list and reconsider after the next cycle.
-- **Skipping Phase 3** — you archived a resume but didn't update `preferences.md`. Next time the skill still makes the same mistakes you manually corrected. Phase 3 is the learning step; without it the memory loop doesn't close.
+- **Promoting a JD-specific choice to rules** — pollutes either the universal layer or your personal style profile. If only one cycle has confirmed a pattern, keep it in the candidate list and reconsider after the next cycle.
+- **Skipping Phase 3** — you archived a resume but didn't update canonical or personal rules. Next time the skill still makes the same mistakes you manually corrected. Phase 3 is the learning step; without it the memory loop doesn't close.
 
 ---
 
 ## Rules model: dual layer (canonical + personal)
 
-The skill applies BOTH `references/canonical-rules.md` AND `preferences.md`. They serve different purposes:
+The skill applies BOTH its mirrored `references/canonical-rules.md` file and the project-root `preferences.md`. They serve different purposes:
 
 | File | ID prefix | Scope | Distribution |
 |---|---|---|---|
-| `references/canonical-rules.md` | `C###` | Universal — works for any user, stack, JD | Open-source ship |
+| Skill `references/canonical-rules.md` | `C###` | Universal — works for any user, stack, JD | Open-source ship |
 | `preferences.md` | `P###` / `L###` | Personal — your style, your carve-outs | Gitignored under Path A |
 
 A rule in `preferences.md` may be **purely personal** (your aesthetic/voice) OR a **carve-out over canonical** (a tighter / narrower variant of a `C###` rule). Carve-outs reference the parent canonical rule explicitly.
@@ -192,7 +282,7 @@ Each rule has:
 - **How to apply** — operational instruction
 - **Example from cycle** (preferences only) — concrete cycle that produced it
 
-Rules are **promoted retrospectively** from `edits/<slug>/note.md`, never added speculatively. To promote from `preferences.md` to `canonical-rules.md`, a rule must pass the 4-criterion test (stack-agnostic, domain-agnostic, seniority-agnostic, example-defrostable) — see `references/canonical-rules.md` for the protocol. If two cycles disagree on a rule, that's a signal — refine the condition, demote, or delete.
+Rules are **promoted retrospectively** from `edits/<slug>/note.md`, never added speculatively. To promote into canonical rules, a rule must pass the 4-criterion test (stack-agnostic, domain-agnostic, seniority-agnostic, example-defrostable) — see the skill's `references/canonical-rules.md` for the protocol. If two cycles disagree on a rule, that's a signal — refine the condition, demote, or delete.
 
 ---
 

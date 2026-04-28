@@ -81,5 +81,36 @@ Use `FORCE=1` only for an intentional replacement.
 If you later edit the internal approved `.tex`, regenerate the public source with
 `FORCE=1 make export JOB=<job>`.
 
-`make learn` does not update `preferences.md` automatically. It creates a diff
-and note template under `edits/<job>/` so preference promotion stays reviewed.
+`make learn` does not update rule files automatically. It creates a diff and
+three-tier `note.md` template under `edits/<job>/` so you can manually decide
+whether an edit belongs in canonical rules, personal preferences, or should stay
+JD-specific. It is meant for current `official` samples and refuses legacy,
+validation, or archive samples unless you deliberately override with `FORCE=1`.
+
+## Status and Corpus Checks
+
+Check one job's lifecycle and approved-sample class:
+
+```sh
+make status JOB=agentic-ai-engineer
+```
+
+`status` reports whether the slug is imported, drafted, begun, approved, and
+learned. `checked` is intentionally not stored; run `make check JOB=<job>` when
+you want to validate the current draft.
+
+Approved samples are classified as:
+
+- `official` — current examples the skill may use for structure
+- `legacy` — retained history, not a current example
+- `validation-sample` — flow/regression test material
+- `archive` — retired or parked material under `approved/_*/`
+
+Validate every current official approved artifact:
+
+```sh
+make check-all
+```
+
+`check-all` compiles and checks approved resumes, not drafts. It skips `legacy`,
+`validation-sample`, and `archive` samples.

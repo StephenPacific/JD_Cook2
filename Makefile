@@ -14,7 +14,7 @@ LATEX_OUT := $(OUT_ROOT)/latex/$(SCOPE)/$(JOB)
 PDF_OUT := $(OUT_ROOT)/pdf/$(SCOPE)
 PDF := $(PDF_OUT)/$(JOB).pdf
 
-.PHONY: pdf draft preview approved approved-pdf import-job begin check approve export learn
+.PHONY: pdf draft preview approved approved-pdf import-job begin check approve export learn status check-all
 
 pdf:
 	@test -f "$(SRC)" || (echo "Missing source: $(SRC)" >&2; exit 1)
@@ -50,3 +50,9 @@ export:
 
 learn:
 	$(PYTHON) scripts/cycle.py learn --job "$(JOB)"
+
+status:
+	$(PYTHON) scripts/cycle.py status --job "$(JOB)"
+
+check-all:
+	$(PYTHON) scripts/cycle.py check-all

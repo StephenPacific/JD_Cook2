@@ -12,6 +12,7 @@ Expected time: **30–45 minutes** the first time (most of it is writing your ow
 - An immutable record of that submission in `approved/<slug>/`
 - Cycle materials in `edits/<slug>/` showing exactly what you changed from the AI draft
 - The first few rules in your personal `preferences.md` that will make future drafts closer to your voice
+- A working `make status` / `make check-all` baseline for the official approved corpus
 
 ---
 
@@ -237,9 +238,11 @@ Edit until you're happy. When you want to validate:
 make check JOB=my-first-jd
 ```
 
-This auto-compiles and runs validators (bullet count ≤ 10, every bullet has a `% src:` comment, no `\mid`, PDF is 1 page, TODO block present, public export stripped when present, etc.). Any failure prints a clear `FAIL: ...` message and exits non-zero.
+This auto-compiles and runs validators (1–10 detectable bullets, the required `\resumeItem{\normalsize{...}}` bullet shape, every bullet followed by `% src:`, no `\mid`, PDF is 1 page, TODO block present, public export stripped when present, etc.). Any failure prints a clear `FAIL: ...` message and exits non-zero.
 
 Fix the failures in the editor, re-run `make check`, repeat until it says `Check passed`.
+
+`make check` validates the current draft only. It does not prove the already-approved corpus is healthy; use `make check-all` after approval for that.
 
 ### 6e. Approve and learn
 
@@ -258,18 +261,21 @@ Inside `approved/my-first-jd/`:
 
 `learn` compares `edits/.../ai-draft.tex` against the approved version, produces a unified `diff.patch`, and drops a `note.md` template with TODO sections for you to fill in.
 
-### 6f. Promote stable patterns to `preferences.md`
+`learn` is meant for current official samples. It refuses `legacy`, `validation-sample`, and `archive` samples unless you deliberately override with `FORCE=1`.
 
-Open `edits/my-first-jd/note.md`. Fill the six sections:
+### 6f. Triage stable patterns into rules
+
+Open `edits/my-first-jd/note.md`. Fill the sections:
 
 - **What Changed** — summarise your substantive edits
-- **Preference Candidates** — rules that might generalise beyond this JD
+- **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
+- **Personal Preference Candidates** — your own voice, visual style, or carve-outs over canonical rules
 - **JD-Specific Choices** — edits you made only because of this JD (do not promote)
 - **Do Not Promote** — tempting-looking patterns that would be unsafe to generalise
-- **Promote to `preferences.md`** — final decisions
+- **Manual Promotion Checklist** — final human review before changing rule files
 - **Open Questions** — things to revisit after interview / rejection / offer
 
-For each entry you decide to promote, open `preferences.md` and add a new rule using the existing format:
+For each personal entry you decide to promote, open `preferences.md` and add a new rule using the existing format:
 
 ```markdown
 ### P### — Short rule name
@@ -285,17 +291,49 @@ For each entry you decide to promote, open `preferences.md` and add a new rule u
 
 Use `P###` for content rules, `L###` for layout rules.
 
+For each universal entry you decide to promote, add it to the skill's mirrored `references/canonical-rules.md` with a `C###` ID only after it passes the 4-criterion test in that file. Keep JD-specific choices inside `note.md`; documenting them is useful, but they should not become rules.
+
+---
+
+### 6g. Inspect status and validate official samples
+
+After approval and learning, inspect the slug:
+
+```bash
+make status JOB=my-first-jd
+```
+
+You should see:
+
+- `imported`, `drafted`, `begun`, `approved`, and `learned` as `yes`
+- sample class `official`
+- no metadata issues
+
+Then validate the official approved corpus:
+
+```bash
+make check-all
+```
+
+`make check-all` compiles and checks approved artifacts, not drafts. It only scans current `official` samples. Historical or test material should be marked as:
+
+- `legacy` — retained history, not a current example
+- `validation-sample` — flow/regression test material
+- `archive` — retired material under `approved/_*/`
+
+The drafting skill only uses official internal approved LaTeX files as structural examples. It skips `_*/`, `legacy`, `validation-sample`, `archive`, and `.public.tex`.
+
 ---
 
 ## Step 7 — Second cycle and onwards
 
-From the second JD onwards, the skill reads your personal `preferences.md` first and applies your rules proactively. You should notice:
+From the second JD onwards, the skill reads canonical rules and your personal `preferences.md` first, then applies both proactively. You should notice:
 
 - Cycle 2: still 3–5 manual edits per draft; mostly new patterns
 - Cycle 3–5: fewer edits, mostly extensions or caveats to existing rules
 - Cycle 6+: the skill produces drafts very close to your voice; most edits are JD-specific tailoring
 
-If your manual edit count isn't decreasing, the skill isn't reading `preferences.md` correctly — investigate before adding more rules.
+If your manual edit count isn't decreasing, the skill may not be reading the rule files correctly — investigate before adding more rules.
 
 ---
 
@@ -321,13 +359,15 @@ If you find a Codex-specific issue, open an issue on the repo — the structural
 - **Skill generates an empty or generic draft** — `raw/` is underseeded. Fill more project notes, or check that the resume PDF is readable (`file raw/resumes/*.pdf` should report PDF).
 - **Draft is over 1 page** — bullets are too long. Validator 7 will tell you explicitly. Compress until 10 bullets × ~22 words each fits.
 - **`make approve` is refusing to overwrite** — that's the safety default. If you really want to re-approve the same slug: `FORCE=1 make approve JOB=<slug>`.
+- **`make learn` refuses with "Sample is legacy / validation-sample / archive"** — that's expected. Learning is for current official samples. Use `make status JOB=<slug>` to inspect the sample class before overriding.
+- **`make check-all` fails but `make check` passes** — `make check` validates the draft; `make check-all` validates official approved artifacts. Fix or re-approve the approved artifact intentionally.
 - **PDF preview not updating in VS Code** — LaTeX Workshop's default builder is `latexmk`. Make sure it's installed (`which latexmk`). Fully quit VS Code (Cmd+Q) and reopen after installing new LaTeX tooling so the extension picks up the updated PATH.
 
 ---
 
 ## Where to go next
 
-- **`USAGE.md`** — the reference manual for day-to-day use (Makefile targets, cycle semantics, check validators, preference-model notes)
+- **`USAGE.md`** — the reference manual for day-to-day use (Makefile targets, lifecycle/sample classes, check validators, rule-model notes)
 - **`PRIVACY.md`** — what to push to a public repo vs keep local; sanitisation checklist before `git push`
 - **`preferences.md`** — your accumulated style rules; read and edit as it grows
 - **`.claude/skills/drafting-resume-from-confirmed-assets/SKILL.md`** — the skill itself; worth reading once to understand the contract it follows

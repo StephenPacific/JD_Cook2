@@ -22,13 +22,13 @@ description: Use when drafting or revising a resume targeted at a specific
 5. **Always:** `references/canonical-rules.md` — universal resume-engineering rules (`C###`) that apply to any user / stack / JD.
 6. **Always:** `preferences.md` at project root — personal style preferences and carve-outs over canonical rules.
 7. **Always:** all files under `raw/` — evidence base. PDFs read via Read tool.
-8. If any exist: up to 3 most recent files in `approved/` — structural examples only, NEVER fact sources.
+8. If any exist: up to 3 most recent **official internal** approved LaTeX files (`approved/<slug>/<slug>.tex`) — structural examples only, NEVER fact sources. Skip directories whose names start with `_` (including `_validation/`) and skip samples whose `metadata.md` has `Status: legacy`, `Status: validation-sample`, or `Status: archive`. Do not use `.public.tex` as an example because it strips audit comments.
 9. If unsure: `references/anti-patterns.md`.
 
 ## Inputs
 - JD: `jobs/<slug>.md` or inline text
 - Evidence: all files under `raw/`
-- Approved examples: up to 3 most recent under `approved/`
+- Approved examples: up to 3 most recent official internal LaTeX files under `approved/<slug>/<slug>.tex`; skip `_*/`, `legacy`, `validation-sample`, `archive`, and `.public.tex`
 - Preferences: `preferences.md`
 - Template: `references/latex-template.local.tex` if present, else `references/latex-template.tex`
 
