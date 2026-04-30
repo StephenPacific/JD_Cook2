@@ -211,26 +211,20 @@ Manual creation is still fine: create `jobs/my-first-jd.md` in your editor and p
 ### 6b. Start Claude Code and invoke the skill
 
 ```bash
-claude  # or however your runtime starts
+make draft JOB=my-first-jd
 ```
 
-Then, in the Claude Code chat:
+This writes `edits/my-first-jd/context.md`, selecting only similar official approved examples for structure (default 2; `CONTEXT_LIMIT=3` if you intentionally want more), then invokes a local agent (`codex` first, then `claude`) with the `drafting-resume-from-confirmed-assets` skill. The skill reads `preferences.md` (empty or near-empty on first cycle), scans `raw/`, analyses the JD, and writes `drafts/my-first-jd.tex`. During drafting, the agent should read only approved examples listed in `context.md` and should never read `edits/*/note.md`.
 
-> Use the `drafting-resume-from-confirmed-assets` skill to draft a resume for `jobs/my-first-jd.md`.
+### 6c. Confirm the AI snapshot exists **before** editing
 
-The skill reads `preferences.md` (empty or near-empty on first cycle), scans `raw/`, analyses the JD, and writes `drafts/my-first-jd.tex`.
+`make draft` automatically copies the AI version to `edits/my-first-jd/ai-draft.tex`.
 
-### 6c. Snapshot the AI draft **before** editing
-
-```bash
-make begin JOB=my-first-jd
-```
-
-This copies the AI version to `edits/my-first-jd/ai-draft.tex`. **Do this before you open the editor.** If you edit first, the snapshot captures your edits and the learn-step diff loses its meaning.
+This snapshot must exist before you open the editor. Manual draft insertion is not part of the standard flow because it makes the learn-step diff unreliable.
 
 ### 6d. Edit + validate loop
 
-Open `drafts/my-first-jd.tex` in VS Code. Cmd+Alt+V opens the PDF preview on the right.
+Open `drafts/my-first-jd.tex` in VS Code, Overleaf, or your LaTeX editor. In VS Code, Cmd+Alt+V opens the PDF preview on the right.
 
 Edit until you're happy. When you want to validate:
 
@@ -259,15 +253,17 @@ Inside `approved/my-first-jd/`:
 - `my-first-jd.public.tex` strips those comments and is the version to share if anyone asks for LaTeX source.
 - `my-first-jd.pdf` is the normal application PDF.
 
-`learn` compares `edits/.../ai-draft.tex` against the approved version, produces a unified `diff.patch`, and drops a `note.md` template with TODO sections for you to fill in.
+`learn` compares `edits/.../ai-draft.tex` against the approved version, produces a unified `diff.patch`, writes a prefilled `note.md`, and prints the note so you can review the suggested triage immediately. After those learning artifacts exist, it removes `drafts/my-first-jd.tex`; `drafts/` is only the active workspace.
 
 `learn` is meant for current official samples. It refuses `legacy`, `validation-sample`, and `archive` samples unless you deliberately override with `FORCE=1`.
 
+If you are cleaning an older cycle created before automatic cleanup existed, use `make clean-draft JOB=<slug>` after `approved` and `learned` are both present.
+
 ### 6f. Triage stable patterns into rules
 
-Open `edits/my-first-jd/note.md`. Fill the sections:
+Review the `edits/my-first-jd/note.md` that `make learn` printed. The first pass is prefilled from the diff; edit the sections when your judgement disagrees:
 
-- **What Changed** — summarise your substantive edits
+- **What Changed** — verify the generated summary of substantive edits
 - **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
 - **Personal Preference Candidates** — your own voice, visual style, or carve-outs over canonical rules
 - **JD-Specific Choices** — edits you made only because of this JD (do not promote)
@@ -275,7 +271,14 @@ Open `edits/my-first-jd/note.md`. Fill the sections:
 - **Manual Promotion Checklist** — final human review before changing rule files
 - **Open Questions** — things to revisit after interview / rejection / offer
 
-For each personal entry you decide to promote, open `preferences.md` and add a new rule using the existing format:
+After printing the note, `make learn` asks whether to promote anything:
+
+- Press Enter / choose `0` to pass for now.
+- Choose `1` to append a personal content rule (`P###`) to `preferences.md`.
+- Choose `2` to append a personal layout rule (`L###`) to `preferences.md`.
+- Choose `3` for canonical candidates. Canonical rules stay manual because public `C###` rules must pass the 4-criterion test.
+
+If you choose a personal promotion, the prompt asks for a short title, rule text, optional rationale, and optional caveat, then appends the entry to `preferences.md` using this format:
 
 ```markdown
 ### P### — Short rule name
@@ -288,8 +291,6 @@ For each personal entry you decide to promote, open `preferences.md` and add a n
 
 **Source:** `edits/my-first-jd/note.md` (bullet N — quoted evidence).
 ```
-
-Use `P###` for content rules, `L###` for layout rules.
 
 For each universal entry you decide to promote, add it to the skill's mirrored `references/canonical-rules.md` with a `C###` ID only after it passes the 4-criterion test in that file. Keep JD-specific choices inside `note.md`; documenting them is useful, but they should not become rules.
 
@@ -305,7 +306,8 @@ make status JOB=my-first-jd
 
 You should see:
 
-- `imported`, `drafted`, `begun`, `approved`, and `learned` as `yes`
+- `imported`, `snapshotted`, `approved`, and `learned` as `yes`
+- `drafted` may be `no` after `make learn` cleans the active workspace draft
 - sample class `official`
 - no metadata issues
 
@@ -358,6 +360,7 @@ If you find a Codex-specific issue, open an issue on the repo — the structural
 - **`FAIL: File 'fontaxes.sty' not found` or similar** — run `sudo tlmgr install fontaxes`. Repeat for each missing `.sty` the error names.
 - **Skill generates an empty or generic draft** — `raw/` is underseeded. Fill more project notes, or check that the resume PDF is readable (`file raw/resumes/*.pdf` should report PDF).
 - **Draft is over 1 page** — bullets are too long. Validator 7 will tell you explicitly. Compress until 10 bullets × ~22 words each fits.
+- **Draft looks like a bad role fit before approval** — abort the unsubmitted cycle with `make abort JOB=<slug>`. This removes the imported JD, draft, AI snapshot, and draft build artifacts, but refuses if an `approved/<slug>/` record exists.
 - **`make approve` is refusing to overwrite** — that's the safety default. If you really want to re-approve the same slug: `FORCE=1 make approve JOB=<slug>`.
 - **`make learn` refuses with "Sample is legacy / validation-sample / archive"** — that's expected. Learning is for current official samples. Use `make status JOB=<slug>` to inspect the sample class before overriding.
 - **`make check-all` fails but `make check` passes** — `make check` validates the draft; `make check-all` validates official approved artifacts. Fix or re-approve the approved artifact intentionally.

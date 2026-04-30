@@ -45,11 +45,12 @@ jobs/                                                     one file per JD you ap
   └── _sources/<slug>/                                      import snapshots (clipboard/url)
 drafts/                                                   AI-generated + your edits
 approved/<slug>/                                          immutable submission record
+edits/<slug>/context.md                                   selected draft context
 edits/<slug>/                                             cycle learning materials
 preferences.md                                            accumulated style rules (P### / L###)
 Makefile                                                  cycle orchestration
 scripts/import_job.py                                     clipboard/url -> jobs/<slug>.md
-scripts/cycle.py                                          begin / check / approve / learn
+scripts/cycle.py                                          check / approve / learn / status
 build/                                                    compiled PDFs (gitignored)
 ```
 
@@ -77,45 +78,45 @@ build/                                                    compiled PDFs (gitigno
    ```
 
    If `MODE` is omitted, the importer uses `auto`: try HTTP first, then JS if the page looks too sparse. `MODE=js` uses Playwright for JS-heavy pages. It does not log in, solve CAPTCHA, click Apply, or bypass access controls. If a site blocks automated rendering, use `FROM=clipboard`.
-3. In Claude Code, ask it to draft the resume:
+3. Generate the initial draft:
 
-   > "Use the `drafting-resume-from-confirmed-assets` skill to draft a resume for `jobs/<slug>.md`."
+   ```bash
+   make draft JOB=<slug>
+   ```
 
-   The skill reads canonical rules plus `preferences.md` automatically and applies learned rules. Output lands in `drafts/<slug>.tex`.
+   `make draft` first writes `edits/<slug>/context.md`, selecting only similar official approved examples for structure and forbidding draft-time reads of unselected approved files or `edits/*/note.md`. The default context limit is 2 examples; use `CONTEXT_LIMIT=3` only when a role genuinely benefits from more history. It then invokes a local agent (`codex` first, then `claude`) with the `drafting-resume-from-confirmed-assets` skill. The skill reads canonical rules plus `preferences.md`, applies learned rules, writes `drafts/<slug>.tex`, and snapshots the untouched AI draft to `edits/<slug>/ai-draft.tex`.
 
 ### Phase 2 — Cycle (Makefile)
 
 Run these in order from the project root:
 
 ```bash
-# BEFORE editing anything, snapshot the AI draft:
-make begin JOB=<slug>
-
-# Edit drafts/<slug>.tex in VS Code (LaTeX Workshop for live PDF preview).
+# Edit drafts/<slug>.tex in VS Code, Overleaf, or your LaTeX editor.
 # Validate whenever you want (auto-compiles first):
 make check JOB=<slug>
 
 # When everything passes, approve:
 make approve JOB=<slug>
 
-# Generate diff.patch and note.md template for learning:
+# Generate diff.patch and a prefilled note.md for learning:
 make learn JOB=<slug>
 ```
 
-**Order matters.** `make begin` must run **before** you edit — otherwise the snapshot captures your edits, not the AI's original, and the diff becomes meaningless.
+**Order matters.** `make draft` must run before you edit because it creates both the draft and the AI snapshot used by `make learn`. Manual draft insertion is not part of the standard flow.
 
 ### Phase 3 — Triage learning into rules
 
-1. Open `edits/<slug>/note.md` and fill the sections:
-   - **What Changed** — summarise your substantive edits
+1. Review the `edits/<slug>/note.md` printed by `make learn`, then answer the promotion prompt:
+   - **What Changed** — prefilled from the diff; verify the summary
    - **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
    - **Personal Preference Candidates** — your own voice, visual style, or carve-outs over canonical rules
    - **JD-Specific Choices** — this JD only, don't promote
    - **Do Not Promote** — tempting but unsafe generalisations
    - **Manual Promotion Checklist** — final human review before changing rule files
-2. Manually add accepted universal rules to the skill's `references/canonical-rules.md` using `C###` IDs.
-3. Manually add accepted personal rules to `preferences.md` using `P###` (content) or `L###` (layout) IDs.
-4. Next time the skill runs, it reads both rule layers automatically.
+2. Press Enter / choose `0` if nothing should be promoted yet.
+3. Choose `1` or `2` to append a personal `P###` or `L###` rule to `preferences.md`.
+4. Choose `3` for canonical candidates; these stay manual because public `C###` rules must pass the 4-criterion test.
+5. Next time the skill runs, it reads both rule layers automatically.
 
 ---
 
@@ -133,8 +134,8 @@ These states are derived from files on disk, except `checked`, which is an actio
 | State | Meaning |
 |---|---|
 | `imported` | `jobs/<slug>.md` exists. |
-| `drafted` | `drafts/<slug>.tex` exists. |
-| `begun` | `edits/<slug>/ai-draft.tex` exists. This must be created before user edits. |
+| `drafted` | `drafts/<slug>.tex` exists as an active working draft. Completed cycles may show `drafted: no` after `make learn` cleans the workspace copy. |
+| `snapshotted` | `edits/<slug>/ai-draft.tex` exists. This is created by `make draft` before user edits. |
 | `checked` | `make check JOB=<slug>` can pass now. This is not persisted; do not treat it as historical proof. |
 | `approved` | `approved/<slug>/` exists with the approved artifact set. |
 | `learned` | `edits/<slug>/note.md` exists. |
@@ -192,13 +193,15 @@ User-editable / preserve-on-replace fields:
 |---|---|
 | `make import-job JOB=<slug> FROM=clipboard` | Reads your clipboard and writes `jobs/<slug>.md` plus `jobs/_sources/<slug>/`. |
 | `make import-job JOB=<slug> URL="..." MODE=http/js` | Imports a public JD URL into `jobs/<slug>.md`; omitting `MODE` uses `auto`, and `MODE=js` requires Playwright. |
-| `make draft JOB=<slug>` | Compile `drafts/<slug>.tex` → `build/pdf/drafts/<slug>.pdf`. Used by `check`. |
+| `make draft JOB=<slug>` | Writes `edits/<slug>/context.md` with selected similar approved examples (default 2; override with `CONTEXT_LIMIT=3`), invokes a local agent to generate `drafts/<slug>.tex` from `jobs/<slug>.md` + `raw/`, then snapshots it to `edits/<slug>/ai-draft.tex`. This is the only standard way to create an editable draft. |
+| `make preview JOB=<slug>` / `make draft-pdf JOB=<slug>` | Compile active `drafts/<slug>.tex` → `build/pdf/drafts/<slug>.pdf`. Used by `check`. |
 | `make approved JOB=<slug>` | Compile `approved/<slug>/<slug>.tex` → `build/pdf/approved/<slug>.pdf`. |
-| `make begin JOB=<slug>` | Snapshot `drafts/<slug>.tex` to `edits/<slug>/ai-draft.tex`. Refuses overwrite; `FORCE=1` to override. |
 | `make check JOB=<slug>` | Compiles + runs validators via `scripts/cycle.py`. Fails on any violation. |
 | `make approve JOB=<slug>` | Runs `check` first, then copies the internal audit `.tex` + `.pdf` into `approved/<slug>/`, auto-generates `<slug>.public.tex`, and writes `metadata.md`. |
 | `make export JOB=<slug>` | Generates `approved/<slug>/<slug>.public.tex` from the internal approved `.tex` by stripping `% src:` / `% TODO:` comments. Use `FORCE=1` to regenerate. |
-| `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + `note.md` template. Refuses non-official samples unless `FORCE=1`. |
+| `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + a prefilled `note.md`, prints the note, asks whether to promote a personal `P###` / `L###` rule, updates metadata, then removes the active `drafts/<slug>.tex` workspace copy. Refuses non-official samples unless `FORCE=1`. |
+| `make clean-draft JOB=<slug>` | Safely removes `drafts/<slug>.tex` only after approved and learned artifacts exist. Useful for old cycles created before automatic cleanup. |
+| `make abort JOB=<slug>` | Terminates an unsuitable unapproved cycle and removes `jobs/<slug>.md`, `jobs/_sources/<slug>/`, `drafts/<slug>.tex`, `edits/<slug>/`, and draft build artifacts. Refuses if `approved/<slug>/` exists. |
 | `make status JOB=<slug>` | Reports lifecycle state, sample class, metadata issues, and non-persisted `checked` guidance for one slug. |
 | `make check-all` | Compiles and validates every current `official` approved artifact; skips `legacy`, `validation-sample`, and `archive`. |
 
@@ -215,6 +218,30 @@ generated automatically by `make approve` and can be regenerated with
 
 If someone asks for the LaTeX source, share `.public.tex`, not the internal
 audit `.tex`.
+
+### Active draft cleanup
+
+`drafts/` is an active workspace, not the long-term archive. After `make approve`
+and `make learn` succeed, the approved resume already exists in `approved/` and
+the learning snapshot exists in `edits/<slug>/final-approved.tex`. At that point
+`make learn` removes `drafts/<slug>.tex` so old completed cycles do not clutter
+the active draft folder.
+
+For completed cycles, `make status` may therefore show `drafted: no` while
+`approved: yes` and `learned: yes`. That is expected.
+
+For older cycles created before this cleanup behavior, run
+`make clean-draft JOB=<slug>` after confirming the cycle is approved and learned.
+
+If a JD turns out to be a poor fit before approval, terminate the active cycle:
+
+```sh
+make abort JOB=<slug>
+```
+
+`abort` is intentionally limited to unapproved cycles. Once `approved/<slug>/`
+exists, the job is submission history and must be archived or edited
+intentionally rather than deleted by active-workspace cleanup.
 
 ---
 
@@ -255,7 +282,7 @@ reuses the same validators against compiled `official` approved artifacts.
 
 ## Common pitfalls
 
-- **Editing before `make begin`** — snapshot becomes your edit, diff becomes empty. Always `begin` first.
+- **Editing outside `make draft`** — snapshot may be missing or may not match the AI draft, so the learn-step diff loses meaning. Always start with `make draft`.
 - **Mixing `\mid` and `\textbar{}`** — `\mid` is math-mode only; in text it raises *"Missing $ inserted"*. Validator 5 catches this.
 - **Adding a bullet without `% src:`** — validator 2 fails. Either add the source comment or delete the bullet.
 - **Bullets too long** — each bullet > ~25 words pushes rendering to 2 lines; 10 bullets × 2 lines overflows the 1-page budget. Validator 7 catches the overflow.

@@ -73,6 +73,10 @@ def draft_log(job: str) -> Path:
     return ROOT / "build" / "latex" / "drafts" / job / f"{job}.log"
 
 
+def draft_latex_dir(job: str) -> Path:
+    return ROOT / "build" / "latex" / "drafts" / job
+
+
 def approved_pdf(job: str) -> Path:
     return ROOT / "build" / "pdf" / "approved" / f"{job}.pdf"
 
@@ -95,6 +99,14 @@ def public_tex(job: str) -> Path:
 
 def edits_dir(job: str) -> Path:
     return ROOT / "edits" / job
+
+
+def job_markdown(job: str) -> Path:
+    return ROOT / "jobs" / f"{job}.md"
+
+
+def job_source_dir(job: str) -> Path:
+    return ROOT / "jobs" / "_sources" / job
 
 
 def metadata_path(job_dir: Path) -> Path:
@@ -173,12 +185,18 @@ def sample_dirs_for_job(job: str) -> list[Path]:
     return [path for path in candidates if path.exists()]
 
 
-def begin(args: argparse.Namespace) -> None:
-    job = require_job(args)
-    src = draft_tex(job)
-    dst = edits_dir(job) / "ai-draft.tex"
-    copy_new(src, dst, force=force_enabled(args))
-    print(f"Cycle snapshot ready: {rel(dst)}")
+def approved_tex_for_sample(job: str, sample_dir: Path | None = None) -> Path:
+    if sample_dir is None:
+        return approved_tex(job)
+    return sample_dir / f"{job}.tex"
+
+
+def existing_approved_tex_for_job(job: str) -> Path:
+    for sample_dir in sample_dirs_for_job(job):
+        candidate = approved_tex_for_sample(job, sample_dir)
+        if candidate.exists():
+            return candidate
+    return approved_tex(job)
 
 
 def page_count_from_log(log_text: str) -> int | None:
@@ -414,6 +432,384 @@ def update_metadata_cycle_notes(job: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def preferences_path() -> Path:
+    return ROOT / "preferences.md"
+
+
+def next_preference_id(prefix: str) -> str:
+    path = preferences_path()
+    if not path.exists():
+        return f"{prefix}001"
+    matches = re.findall(rf"### {re.escape(prefix)}(\d{{3}})\b", path.read_text(encoding="utf-8"))
+    if not matches:
+        return f"{prefix}001"
+    return f"{prefix}{max(int(match) for match in matches) + 1:03d}"
+
+
+def ensure_preferences_file() -> str:
+    path = preferences_path()
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return """# User Preferences (Personal)
+
+This file holds personal style preferences for this user only.
+
+---
+
+## Personal-only preferences
+
+---
+
+## Personal carve-outs over canonical rules
+"""
+
+
+def append_personal_preference(job: str, prefix: str) -> bool:
+    rule_id = next_preference_id(prefix)
+    label = "layout preference" if prefix == "L" else "content preference"
+    print(f"\nPromoting new {label}: {rule_id}")
+    title = input("Short title (blank cancels): ").strip()
+    if not title:
+        print("Promotion cancelled.")
+        return False
+    rule = input("Rule text: ").strip()
+    if not rule:
+        print("Promotion cancelled: rule text is required.")
+        return False
+    why = input("Why / when to apply (optional): ").strip()
+    caveat = input("Caveat / when NOT to apply (optional): ").strip()
+    note_rel = rel(edits_dir(job) / "note.md")
+
+    entry = [
+        f"### {rule_id} — {title}",
+        "",
+        f"**Rule:** {rule}",
+        "",
+        f"**Why:** {why or f'Promoted from `{note_rel}` after approved-cycle review.'}",
+        "",
+        f"**Source:** `{note_rel}` (promoted interactively by `make learn`).",
+    ]
+    if caveat:
+        entry.extend(("", f"**Caveat:** {caveat}"))
+    entry_text = "\n".join(entry) + "\n\n"
+
+    text = ensure_preferences_file()
+    marker = "\n---\n\n## Personal carve-outs over canonical rules"
+    if marker in text:
+        text = text.replace(marker, "\n" + entry_text + marker, 1)
+    else:
+        text = text.rstrip() + "\n\n" + entry_text
+
+    path = preferences_path()
+    path.write_text(text, encoding="utf-8")
+    print(f"Promoted {rule_id} to {rel(path)}")
+    return True
+
+
+def promotion_review(job: str) -> None:
+    if not sys.stdin.isatty():
+        print("\nPromotion review skipped: non-interactive shell. Review the note and update rules manually if needed.")
+        return
+
+    print("\nPromotion review")
+    print("Choose what to do with the generated note:")
+    print("  [Enter]/0  pass for now")
+    print("  1          promote a personal content preference to preferences.md (P###)")
+    print("  2          promote a personal layout preference to preferences.md (L###)")
+    print("  3          canonical candidate only; keep it in note.md for manual review")
+
+    while True:
+        choice = input("Selection [0]: ").strip().lower()
+        if choice in ("", "0", "n", "no", "pass"):
+            print("No rule promoted. Note remains as the audit record.")
+            return
+        if choice in ("1", "p", "personal"):
+            append_personal_preference(job, "P")
+        elif choice in ("2", "l", "layout"):
+            append_personal_preference(job, "L")
+        elif choice in ("3", "c", "canonical"):
+            print(
+                "Canonical rules are intentionally not auto-written. "
+                "Keep the candidate in note.md until it passes the 4-criterion test "
+                "and is mirrored in the skill references."
+            )
+        else:
+            print("Unknown selection. Choose 0, 1, 2, or 3.")
+            continue
+
+        again = input("Promote another item? [y/N]: ").strip().lower()
+        if again not in ("y", "yes"):
+            return
+
+
+def truncate_note_line(text: str, limit: int = 220) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."
+
+
+def extract_resume_item(line: str) -> str | None:
+    marker = r"\resumeItem{\normalsize{"
+    start = line.find(marker)
+    if start == -1:
+        return None
+    body = line[start + len(marker) :].strip()
+    if body.endswith("}}"):
+        body = body[:-2]
+    return truncate_note_line(body)
+
+
+def extract_todo_comment(line: str) -> str | None:
+    stripped = line.strip()
+    if not stripped.startswith("% TODO:"):
+        return None
+    return truncate_note_line(stripped.removeprefix("% TODO:").strip())
+
+
+def summarize_diff_lines(diff: str) -> dict[str, list[str]]:
+    added_lines: list[str] = []
+    removed_lines: list[str] = []
+    for line in diff.splitlines():
+        if line.startswith("+++") or line.startswith("---"):
+            continue
+        if line.startswith("+"):
+            added_lines.append(line[1:])
+        elif line.startswith("-"):
+            removed_lines.append(line[1:])
+
+    added_bullets = [item for line in added_lines if (item := extract_resume_item(line))]
+    removed_bullets = [item for line in removed_lines if (item := extract_resume_item(line))]
+    added_todos = [item for line in added_lines if (item := extract_todo_comment(line))]
+    removed_todos = [item for line in removed_lines if (item := extract_todo_comment(line))]
+
+    def noteworthy(lines: list[str]) -> list[str]:
+        patterns = (
+            r"\\section",
+            r"\\resume(Subheading|SingleSubheading)",
+            r"\\textbf\{\\normalsize",
+        )
+        selected: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("% src:") or stripped.startswith("% TODO:"):
+                continue
+            if extract_resume_item(stripped):
+                continue
+            if any(re.search(pattern, stripped) for pattern in patterns):
+                selected.append(truncate_note_line(stripped))
+        return selected
+
+    return {
+        "added_lines": [truncate_note_line(line) for line in added_lines if line.strip()],
+        "removed_lines": [truncate_note_line(line) for line in removed_lines if line.strip()],
+        "added_bullets": added_bullets,
+        "removed_bullets": removed_bullets,
+        "added_todos": added_todos,
+        "removed_todos": removed_todos,
+        "added_noteworthy": noteworthy(added_lines),
+        "removed_noteworthy": noteworthy(removed_lines),
+    }
+
+
+def note_list(items: list[str], empty: str, limit: int = 8) -> str:
+    if not items:
+        return f"- {empty}"
+    lines = [f"- {item}" for item in items[:limit]]
+    remaining = len(items) - limit
+    if remaining > 0:
+        lines.append(f"- ... {remaining} more; inspect `diff.patch` for the full list.")
+    return "\n".join(lines)
+
+
+def generate_note(job: str, diff: str, approved_sample: Path | None) -> str:
+    summary = summarize_diff_lines(diff)
+    sample_dir = approved_sample if approved_sample else approved_dir(job)
+    approved_rel = rel(sample_dir)
+    diff_is_empty = diff.startswith("# No text diff detected.")
+
+    if diff_is_empty:
+        change_overview = (
+            "- No text diff detected between the AI draft snapshot and approved resume.\n"
+            "- Treat this as a pipeline / validation cycle rather than evidence for a drafting preference.\n"
+            "- Confirm manually that the approved artifact was intentionally accepted as-is."
+        )
+    else:
+        change_overview = "\n".join(
+            (
+                f"- Diff changed {len(summary['added_lines'])} added lines and {len(summary['removed_lines'])} removed lines.",
+                f"- Resume bullets added or rewritten in final: {len(summary['added_bullets'])}.",
+                f"- Draft bullets removed or replaced: {len(summary['removed_bullets'])}.",
+                f"- Final TODO gap comments added or reworded: {len(summary['added_todos'])}.",
+                f"- Draft TODO gap comments removed or reworded: {len(summary['removed_todos'])}.",
+            )
+        )
+
+    canonical_candidates: list[str] = []
+    if summary["added_todos"] or summary["removed_todos"]:
+        canonical_candidates.append(
+            "Gap honesty / unsupported-claim guardrail: final edits changed TODO gap wording. "
+            "Candidate only if this pattern recurs across cycles; T1/T2/T3 likely yes, T4 yes if examples can be defrosted."
+        )
+    if summary["added_bullets"] and summary["removed_bullets"]:
+        canonical_candidates.append(
+            "Rewrite around workflow/outcome rather than raw tool listing: compare added vs removed bullets below. "
+            "Candidate only if the same rewrite direction appears in another JD."
+        )
+    if not canonical_candidates:
+        canonical_candidates.append(
+            "No automatic canonical candidate. Keep this cycle as evidence unless a repeated, stack/domain/seniority-safe pattern appears."
+        )
+
+    personal_candidates: list[str] = []
+    if summary["added_bullets"]:
+        personal_candidates.append(
+            "Voice/order preference candidate: inspect accepted final bullets for recurring wording density, project order, or bullet-count preference."
+        )
+    if summary["added_noteworthy"] or summary["removed_noteworthy"]:
+        personal_candidates.append(
+            "Layout/section candidate: inspect noteworthy structural line changes before assigning an Lxxx preference."
+        )
+    if not personal_candidates:
+        personal_candidates.append("No obvious personal preference candidate from the deterministic diff scan.")
+
+    jd_specific_items: list[str] = []
+    jd_specific_items.extend(f"Final gap retained/reworded: {item}" for item in summary["added_todos"])
+    if not jd_specific_items and diff_is_empty:
+        jd_specific_items.append("No JD-specific edit surfaced; accepted draft may still contain JD-specific choices in the approved artifact.")
+    elif not jd_specific_items:
+        jd_specific_items.append("No TODO gap change detected; review bullet rewrites for JD-specific positioning before promoting any rule.")
+
+    do_not_promote = [
+        "Do not promote a JD keyword from a TODO gap into a resume claim unless new raw evidence is added.",
+        "Do not turn one accepted rewrite into a strict skill rule; promote only after repeated cycles or a mechanically checkable invariant.",
+        "Do not treat removed draft content as globally bad until the JD-specific reason is clear.",
+    ]
+
+    return f"""# Edits Note — {job}
+
+## Context
+
+- Cycle status: approved artifact in `{approved_rel}/` (`.tex` internal audit + `.public.tex` share-safe).
+- Diff source: `edits/{job}/diff.patch`
+- AI snapshot: `edits/{job}/ai-draft.tex`
+- Final user-edited: `edits/{job}/final-approved.tex`
+- Prefill source: deterministic `make learn` diff scan. Review before promoting any rule.
+- Purpose: triage edits into 3 tiers (canonical rule / personal preference / JD-specific) so the rule system grows without overfitting.
+
+**Promotion is manual.** This file extracts candidates; **you** decide what to promote and where. AI does NOT modify `references/canonical-rules.md`, `preferences.md`, or `SKILL.md` from a single cycle.
+
+---
+
+## 1. What changed
+
+{change_overview}
+
+### Final bullets added or rewritten
+
+{note_list(summary["added_bullets"], "No final bullet additions detected.")}
+
+### Draft bullets removed or replaced
+
+{note_list(summary["removed_bullets"], "No draft bullet removals detected.")}
+
+### Noteworthy structural / skills lines
+
+Added:
+
+{note_list(summary["added_noteworthy"], "No structural or skills-line additions detected.", limit=6)}
+
+Removed:
+
+{note_list(summary["removed_noteworthy"], "No structural or skills-line removals detected.", limit=6)}
+
+---
+
+## 2. Canonical rule candidates → `references/canonical-rules.md`
+
+Promote to canonical (`Cxxx` ID) ONLY if all 4 criteria pass:
+
+- **T1 STACK-AGNOSTIC** — rule works regardless of tech stack (React / Spring / Go / etc.)
+- **T2 DOMAIN-AGNOSTIC** — rule works regardless of industry (finance / health / SaaS / etc.)
+- **T3 SENIORITY-AGNOSTIC** — rule applies to grad / mid / senior (or explicitly scoped)
+- **T4 EXAMPLE-DEFROSTABLE** — rule survives once user-specific examples are removed
+
+Initial candidates from this diff:
+
+{note_list(canonical_candidates, "No canonical candidate from deterministic scan.")}
+
+Recommendation: do not promote from this file alone unless the candidate is already supported by another cycle or is mechanically enforceable in `cycle.py check`.
+
+---
+
+## 3. Personal preference candidates → `preferences.md`
+
+For user-specific aesthetic/voice or carve-outs over canonical rules.
+
+Initial candidates from this diff:
+
+{note_list(personal_candidates, "No personal preference candidate from deterministic scan.")}
+
+Promotion guidance: assign a new `Pxxx` / `Lxxx` only after you agree this reflects your reusable preference, not just this JD.
+
+---
+
+## 4. JD-specific choices (do NOT promote)
+
+Edits driven by THIS JD only. Documenting them prevents future cycles from accidentally generalizing the same edit.
+
+{note_list(jd_specific_items, "No JD-specific choices detected by the diff scan.")}
+
+Removed / reworded draft gaps for reference:
+
+{note_list(summary["removed_todos"], "No removed or reworded draft gap comments detected.")}
+
+---
+
+## 5. Do Not Promote (tempting but unsafe)
+
+{note_list(do_not_promote, "No do-not-promote warnings generated.")}
+
+---
+
+## 6. Manual promotion checklist
+
+When you've decided what to promote, run through this checklist:
+
+- [ ] Append canonical candidates to `references/canonical-rules.md` with `Cxxx` IDs
+- [ ] Append personal candidates to `preferences.md` with `Pxxx` / `Lxxx` IDs (or carve-out references)
+- [ ] Mirror any `references/canonical-rules.md` change to `.agents/skills/.../references/canonical-rules.md`
+- [ ] Run `make check-all` to verify official approved samples after any rule promotion
+- [ ] **Do NOT** modify `SKILL.md` strict rules from a single cycle. Only promote to strict rules after ≥3 cycles confirm the same pattern AND the rule is mechanically enforceable in `cycle.py check`.
+- [ ] Update `SKILL.md` preflight checklist if a new `Cxxx` / `Pxxx` was added
+
+---
+
+## 7. Open questions
+
+- Application outcome/result: update `approved/{job}/metadata.md` when you get interview / rejection / offer feedback.
+- Did the final edit materially improve JD match, or merely polish phrasing?
+- Should any candidate above be merged with an existing `Pxxx`, `Lxxx`, or `Cxxx` instead of creating a new rule?
+"""
+
+
+def clean_active_draft_after_learn(job: str) -> bool:
+    required_paths = (
+        existing_approved_tex_for_job(job),
+        edits_dir(job) / "final-approved.tex",
+        edits_dir(job) / "diff.patch",
+        edits_dir(job) / "note.md",
+    )
+    for path in required_paths:
+        ensure_exists(path, "learn artifact")
+
+    path = draft_tex(job)
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
 def learn(args: argparse.Namespace) -> None:
     job = require_job(args)
     force = force_enabled(args)
@@ -427,7 +823,7 @@ def learn(args: argparse.Namespace) -> None:
         )
 
     ai_path = edits_dir(job) / "ai-draft.tex"
-    final_path = approved_tex(job)
+    final_path = approved_tex_for_sample(job, approved_sample)
     final_copy = edits_dir(job) / "final-approved.tex"
     diff_path = edits_dir(job) / "diff.patch"
     note_path = edits_dir(job) / "note.md"
@@ -449,92 +845,64 @@ def learn(args: argparse.Namespace) -> None:
     )
     write_new(diff_path, diff or "# No text diff detected.\n", force=force)
 
-    note_template = f"""# Edits Note — {job}
-
-## Context
-
-- Cycle status: approved artifact in `approved/{job}/` (`.tex` internal audit + `.public.tex` share-safe).
-- Diff source: `edits/{job}/diff.patch`
-- AI snapshot: `edits/{job}/ai-draft.tex`
-- Final user-edited: `edits/{job}/final-approved.tex`
-- Purpose: triage edits into 3 tiers (canonical rule / personal preference / JD-specific) so the rule system grows without overfitting.
-
-**Promotion is manual.** This file extracts candidates; **you** decide what to promote and where. AI does NOT modify `references/canonical-rules.md`, `preferences.md`, or `SKILL.md` from a single cycle.
-
----
-
-## 1. What changed
-
-Summarize substantive edits from AI draft → final approved. Reference `diff.patch` for line-level detail.
-
-- TODO: bullet-by-bullet or pattern-by-pattern summary
-
----
-
-## 2. Canonical rule candidates → `references/canonical-rules.md`
-
-Promote to canonical (`Cxxx` ID) ONLY if all 4 criteria pass:
-
-- **T1 STACK-AGNOSTIC** — rule works regardless of tech stack (React / Spring / Go / etc.)
-- **T2 DOMAIN-AGNOSTIC** — rule works regardless of industry (finance / health / SaaS / etc.)
-- **T3 SENIORITY-AGNOSTIC** — rule applies to grad / mid / senior (or explicitly scoped)
-- **T4 EXAMPLE-DEFROSTABLE** — rule survives once user-specific examples are removed
-
-Also recommended: rule has been observed in ≥2 cycles (not just this one) before canonical promotion.
-
-- TODO: list candidates with explicit T1/T2/T3/T4 verdict for each.
-
----
-
-## 3. Personal preference candidates → `preferences.md`
-
-For user-specific aesthetic/voice or carve-outs over canonical rules.
-
-- Pure personal: assign new `Pxxx` (content) or `Lxxx` (layout) ID.
-- Carve-out over canonical: reference the parent `Cxxx` and document the tighter constraint (e.g., "P008 carve-out over C012: this user prefers ≤1 bold per bullet, tighter than C012's ≤3").
-
-- TODO: list candidates with proposed ID and (if carve-out) parent `Cxxx`.
-
----
-
-## 4. JD-specific choices (do NOT promote)
-
-Edits driven by THIS JD only. Documenting them prevents future cycles from accidentally generalizing the same edit.
-
-- TODO: list edits with the JD-specific reason (e.g., "removed LOB project — quant firm probes matching engine; for non-trading JDs, LOB stays").
-
----
-
-## 5. Do Not Promote (tempting but unsafe)
-
-Generalizations that look attractive but have known failure modes. Recording them here prevents re-discovery in future cycles.
-
-- TODO: list "almost-rules" with the failure mode that disqualifies them.
-
----
-
-## 6. Manual promotion checklist
-
-When you've decided what to promote, run through this checklist:
-
-- [ ] Append canonical candidates to `references/canonical-rules.md` with `Cxxx` IDs
-- [ ] Append personal candidates to `preferences.md` with `Pxxx` / `Lxxx` IDs (or carve-out references)
-- [ ] Mirror any `references/canonical-rules.md` change to `.agents/skills/.../references/canonical-rules.md`
-- [ ] Run `make check JOB=<recent-slug>` on a recent draft to verify no regression
-- [ ] **Do NOT** modify `SKILL.md` strict rules from a single cycle. Only promote to strict rules after ≥3 cycles confirm the same pattern AND the rule is mechanically enforceable in `cycle.py check`.
-- [ ] Update `SKILL.md` preflight checklist if a new `Cxxx` / `Pxxx` was added
-
----
-
-## 7. Open questions
-
-To revisit after interview / rejection / offer outcome.
-
-- TODO: list anything contingent on outcome.
-"""
-    write_new(note_path, note_template, force=force)
+    note_content = generate_note(job, diff or "# No text diff detected.\n", approved_sample)
+    write_new(note_path, note_content, force=force)
     update_metadata_cycle_notes(job)
+    draft_cleaned = clean_active_draft_after_learn(job)
     print(f"Learning materials ready: {rel(edits_dir(job))}")
+    if draft_cleaned:
+        print(f"- cleaned active draft: {rel(draft_tex(job))}")
+    print(f"\n--- {rel(note_path)} ---")
+    print(note_content.rstrip())
+    print(f"--- end {rel(note_path)} ---")
+    promotion_review(job)
+
+
+def clean_draft(args: argparse.Namespace) -> None:
+    job = require_job(args)
+    if clean_active_draft_after_learn(job):
+        print(f"Active draft cleaned: {rel(draft_tex(job))}")
+    else:
+        print(f"Active draft already absent: {rel(draft_tex(job))}")
+
+
+def remove_path(path: Path, removed: list[str]) -> None:
+    if not path.exists():
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+    removed.append(rel(path))
+
+
+def abort(args: argparse.Namespace) -> None:
+    job = require_job(args)
+    sample_dirs = sample_dirs_for_job(job)
+    if sample_dirs:
+        joined = ", ".join(rel(path) for path in sample_dirs)
+        fail(
+            "Refusing to abort a cycle with approved artifacts. "
+            f"Approved sample(s): {joined}. Archive or edit metadata intentionally instead."
+        )
+
+    removed: list[str] = []
+    for path in (
+        job_markdown(job),
+        job_source_dir(job),
+        draft_tex(job),
+        edits_dir(job),
+        draft_pdf(job),
+        draft_latex_dir(job),
+    ):
+        remove_path(path, removed)
+
+    if removed:
+        print(f"Aborted active cycle: {job}")
+        for item in removed:
+            print(f"- removed: {item}")
+    else:
+        print(f"No active cycle artifacts found for: {job}")
 
 
 def yes_no(value: bool) -> str:
@@ -550,9 +918,9 @@ def status(args: argparse.Namespace) -> None:
     fields = metadata_fields(metadata_path(approved_sample)) if approved_sample else {}
 
     lifecycle = {
-        "imported": (ROOT / "jobs" / f"{job}.md").exists(),
+        "imported": job_markdown(job).exists(),
         "drafted": draft_tex(job).exists(),
-        "begun": (job_edits_dir / "ai-draft.tex").exists(),
+        "snapshotted": (job_edits_dir / "ai-draft.tex").exists(),
         "approved": approved_sample is not None,
         "learned": (job_edits_dir / "note.md").exists(),
     }
@@ -577,16 +945,21 @@ def status(args: argparse.Namespace) -> None:
                 issues.append(f"missing internal approved LaTeX: {rel(approved_tex(job))}")
             if not public_tex(job).exists():
                 issues.append(f"missing public approved LaTeX: {rel(public_tex(job))}")
-    if lifecycle["learned"] and not lifecycle["begun"]:
-        warnings.append("learned note exists but begin snapshot is missing; learning may be manual/reconstructed")
+    if lifecycle["learned"] and not lifecycle["snapshotted"]:
+        warnings.append("learned note exists but AI draft snapshot is missing; learning may be manual/reconstructed")
     if lifecycle["approved"] and not lifecycle["learned"] and sample_class == "official":
         warnings.append("official sample is approved but not learned")
 
     print(f"Status: {job}")
     print("- lifecycle:")
-    for name in ("imported", "drafted", "begun", "approved", "learned"):
+    for name in ("imported", "drafted", "snapshotted", "approved", "learned"):
         print(f"  - {name}: {yes_no(lifecycle[name])}")
-    print("  - checked: not persisted; run `make check JOB={}` to evaluate now".format(job))
+    if lifecycle["drafted"]:
+        print("  - checked: not persisted; run `make check JOB={}` to evaluate the active draft now".format(job))
+    elif lifecycle["approved"] and lifecycle["learned"]:
+        print("  - checked: active draft cleaned after learn; run `make check-all` to validate approved artifacts")
+    else:
+        print("  - checked: unavailable; active draft is missing")
     print("- sample:")
     print(f"  - class: {sample_class}")
     if approved_sample:
@@ -640,7 +1013,10 @@ def check_all(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="JDcook cycle helper")
-    parser.add_argument("command", choices=("begin", "check", "approve", "export", "learn", "status", "check-all"))
+    parser.add_argument(
+        "command",
+        choices=("check", "approve", "export", "learn", "clean-draft", "abort", "status", "check-all"),
+    )
     parser.add_argument("--job")
     parser.add_argument("--force", action="store_true")
     return parser
@@ -648,9 +1024,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    if args.command == "begin":
-        begin(args)
-    elif args.command == "check":
+    if args.command == "check":
         check(args)
     elif args.command == "approve":
         approve(args)
@@ -658,6 +1032,10 @@ def main() -> None:
         export_public(args)
     elif args.command == "learn":
         learn(args)
+    elif args.command == "clean-draft":
+        clean_draft(args)
+    elif args.command == "abort":
+        abort(args)
     elif args.command == "status":
         status(args)
     elif args.command == "check-all":

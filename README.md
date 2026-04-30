@@ -8,14 +8,14 @@ hand, but the preferred path is to import the JD first.
 If the JD is open in your browser, select the JD text, copy it, then run:
 
 ```sh
-make import-job JOB=agentic-ai-engineer FROM=clipboard
+make import-job JOB=my-first-jd FROM=clipboard
 ```
 
 For public pages, URL imports are available:
 
 ```sh
-make import-job JOB=agentic-ai-engineer URL="https://..." MODE=http
-make import-job JOB=agentic-ai-engineer URL="https://..." MODE=js
+make import-job JOB=my-first-jd URL="https://..." MODE=http
+make import-job JOB=my-first-jd URL="https://..." MODE=js
 ```
 
 If `MODE` is omitted, the importer uses `auto`: try HTTP first, then JS if the
@@ -28,41 +28,54 @@ Imports write `jobs/<job>.md` and a private snapshot under
 
 Use the local LaTeX toolchain for preview instead of copying `.tex` into Overleaf.
 
-Compile a draft:
+Preview a draft PDF:
 
 ```sh
-make draft JOB=ml-genai-engineer
+make preview JOB=my-first-jd
 ```
+
+`make draft-pdf JOB=<job>` is the same compile-only operation. `make draft`
+is reserved for AI draft generation.
 
 Compile an approved resume:
 
 ```sh
-make approved JOB=ml-genai-engineer
+make approved JOB=my-first-jd
 ```
 
 PDFs are written under `build/pdf/<scope>/<job>.pdf`.
 
-This only compiles existing LaTeX files. It does not change the drafting workflow,
-raw evidence, approved artifacts, or memory loop.
+Preview commands only compile existing LaTeX files. They do not change raw
+evidence, approved artifacts, or the memory loop.
 
 ## Standard Cycle
 
-After a skill-generated draft exists, start a cycle snapshot before manual edits:
+After importing a JD, generate the initial AI draft:
 
 ```sh
-make begin JOB=agentic-ai-engineer
+make draft JOB=my-first-jd
 ```
 
-Edit `drafts/<job>.tex` with local PDF preview, then run the approval checks:
+`make draft` invokes a local agent (`codex` first, then `claude`) with the
+`drafting-resume-from-confirmed-assets` skill. Before the agent runs, the
+harness writes `edits/<job>/context.md`, selecting only the most similar
+official approved examples for structure. The default limit is 2 selected
+examples (`CONTEXT_LIMIT=3` if you intentionally want more). The agent may read
+only those selected examples, never all of `approved/`, and never
+`edits/*/note.md` during drafting. It then writes `drafts/<job>.tex` and
+automatically snapshots the untouched AI version to `edits/<job>/ai-draft.tex`.
+
+Edit `drafts/<job>.tex` in VS Code, Overleaf, or any LaTeX editor, then run the
+approval checks:
 
 ```sh
-make check JOB=agentic-ai-engineer
+make check JOB=my-first-jd
 ```
 
 When the resume is ready to approve:
 
 ```sh
-make approve JOB=agentic-ai-engineer
+make approve JOB=my-first-jd
 ```
 
 Approval stores two LaTeX versions:
@@ -73,7 +86,7 @@ Approval stores two LaTeX versions:
 Then generate learning materials for the memory loop:
 
 ```sh
-make learn JOB=agentic-ai-engineer
+make learn JOB=my-first-jd
 ```
 
 `make approve` refuses to overwrite an existing `approved/<job>/` directory.
@@ -81,23 +94,44 @@ Use `FORCE=1` only for an intentional replacement.
 If you later edit the internal approved `.tex`, regenerate the public source with
 `FORCE=1 make export JOB=<job>`.
 
-`make learn` does not update rule files automatically. It creates a diff and
-three-tier `note.md` template under `edits/<job>/` so you can manually decide
-whether an edit belongs in canonical rules, personal preferences, or should stay
-JD-specific. It is meant for current `official` samples and refuses legacy,
-validation, or archive samples unless you deliberately override with `FORCE=1`.
+`make learn` does not promote rules without your approval. It creates a diff and
+a prefilled `note.md` under `edits/<job>/`, then prints the note so you can
+review the suggested triage immediately. In an interactive terminal, it then
+asks whether to pass, append a personal `P###` / `L###` rule to `preferences.md`,
+or leave a canonical candidate for manual review. The prefill is deterministic:
+it summarizes bullet changes, gap-comment changes, and candidate rule signals.
+It is meant for current `official` samples and refuses legacy, validation, or
+archive samples unless you deliberately override with `FORCE=1`. After the
+learning artifacts are safely written, it removes the active `drafts/<job>.tex`
+workspace copy because `approved/` and `edits/` now hold the archive records.
+
+For older completed cycles, you can clean the active draft workspace copy with:
+
+```sh
+make clean-draft JOB=my-first-jd
+```
+
+If a JD is a poor fit before approval, abort the unsubmitted cycle:
+
+```sh
+make abort JOB=my-first-jd
+```
+
+`abort` removes imported JD, draft, AI snapshot, and draft build artifacts, but
+refuses once an `approved/<job>/` record exists.
 
 ## Status and Corpus Checks
 
 Check one job's lifecycle and approved-sample class:
 
 ```sh
-make status JOB=agentic-ai-engineer
+make status JOB=my-first-jd
 ```
 
-`status` reports whether the slug is imported, drafted, begun, approved, and
-learned. `checked` is intentionally not stored; run `make check JOB=<job>` when
-you want to validate the current draft.
+`status` reports whether the slug is imported, has an active draft, has an AI
+draft snapshot, is approved, and is learned. `checked` is intentionally not stored;
+run `make check JOB=<job>` when you want to validate an active draft. Completed
+cycles may show `drafted: no` after `make learn` cleans the workspace copy.
 
 Approved samples are classified as:
 
