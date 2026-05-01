@@ -24,6 +24,9 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `raw/code/*.md` (filled) | Real project descriptions, supervisor names, mentor identity, grades | ❌ Never |
 | `jobs/*.md` | JD text (may be company IP) + links to real companies | ❌ Never |
 | `jobs/_sources/<slug>/*` | Clipboard/web snapshots, rendered text, screenshots, URL metadata | ❌ Never |
+| `jd_search/README.md`, `jd_search/search_jobs.py`, `jd_search/import_result.py`, `jd_search/profiles/example.json` | Search framework + sanitized profile template | ✅ Yes |
+| `jd_search/profiles/*.json` except `example.json` | Personal target roles, constraints, and fit preferences | ❌ Never |
+| `jd_search/searches/<slug>/*` | Real search results, shortlists, ranking notes, application targets | ❌ Never |
 | `drafts/*.tex` | Personal resume body + PII header | ❌ Never |
 | `approved/<slug>/*` | Final submitted resumes, internal audit `.tex`, share-safe `.public.tex` | ❌ Never |
 | `edits/<slug>/*` | AI draft + final + diff + note (full PII) | ❌ Never |

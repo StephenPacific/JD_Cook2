@@ -33,6 +33,12 @@ edits/
 # (e.g. 3D micro-CT datasets, 70%--90% metrics). Kept local only.
 preferences.md
 
+# JD search runtime data — profiles and search results may contain personal
+# targeting preferences and real application history. Keep templates only.
+jd_search/profiles/*.json
+!jd_search/profiles/example.json
+jd_search/searches/
+
 # Personal LaTeX template override — kept local only, has real PII baked in.
 # The public `latex-template.tex` uses placeholders; the skill prefers this
 # `.local.tex` when it exists so locally-generated drafts have real values.

@@ -1,0 +1,54 @@
+{
+  "profile_name": "example",
+  "target_roles": [
+    "AI Engineer",
+    "Software Engineer",
+    "Data Engineer"
+  ],
+  "locations": [
+    "Sydney NSW",
+    "Remote Australia"
+  ],
+  "country_indeed": "Australia",
+  "skills": {
+    "strong": [
+      "Python",
+      "LLM evaluation",
+      "React",
+      "TypeScript"
+    ],
+    "usable": [
+      "SQL",
+      "Node.js",
+      "AWS",
+      "data analysis"
+    ],
+    "gap": [
+      "Kubernetes",
+      "large-scale distributed systems"
+    ]
+  },
+  "constraints": {
+    "seniority": [
+      "intern",
+      "junior",
+      "graduate",
+      "mid"
+    ],
+    "remote_ok": true,
+    "avoid_keywords": [
+      "manager",
+      "principal",
+      "staff engineer",
+      "sales",
+      "unpaid"
+    ],
+    "required_keywords": []
+  },
+  "evidence_keywords": [
+    "AI",
+    "automation",
+    "software prototype",
+    "data pipeline"
+  ]
+}

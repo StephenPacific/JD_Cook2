@@ -24,6 +24,31 @@ It does not log in, solve CAPTCHA, click Apply, or bypass access controls.
 Imports write `jobs/<job>.md` and a private snapshot under
 `jobs/_sources/<job>/`.
 
+## Search for Matching Jobs
+
+`jd_search/` is a separate job-discovery layer. It can read `raw/` directly,
+generate a local user profile, run JobSpy, rank results against that generated
+profile, and import selected jobs into the normal `jobs/<job>.md` workflow.
+
+One-command raw-driven search:
+
+```sh
+python3 -m pip install -U python-jobspy
+make match-jobs SEARCH=raw-fit
+```
+
+Preview the raw-driven query plan without searching:
+
+```sh
+make match-jobs SEARCH=raw-fit DRY_RUN=1 FORCE=1
+```
+
+Import the top ranked result as a JD:
+
+```sh
+make import-search-result SEARCH=ai-engineer-sydney RANK=1 JOB=my-first-jd
+```
+
 ## Local PDF Preview
 
 Use the local LaTeX toolchain for preview instead of copying `.tex` into Overleaf.
@@ -83,7 +108,7 @@ Approval stores two LaTeX versions:
 - `approved/<job>/<job>.tex` — internal audit copy, keeps `% src:` / `% TODO:`
 - `approved/<job>/<job>.public.tex` — share-safe source, strips `% src:` / `% TODO:`
 
-Then generate learning materials for the memory loop:
+Optionally generate learning materials for the memory loop:
 
 ```sh
 make learn JOB=my-first-jd
@@ -94,18 +119,27 @@ Use `FORCE=1` only for an intentional replacement.
 If you later edit the internal approved `.tex`, regenerate the public source with
 `FORCE=1 make export JOB=<job>`.
 
-`make learn` does not promote rules without your approval. It creates a diff and
-a prefilled `note.md` under `edits/<job>/`, then prints the note so you can
-review the suggested triage immediately. In an interactive terminal, it then
-asks whether to pass, append a personal `P###` / `L###` rule to `preferences.md`,
-or leave a canonical candidate for manual review. The prefill is deterministic:
-it summarizes bullet changes, gap-comment changes, and candidate rule signals.
-It is meant for current `official` samples and refuses legacy, validation, or
-archive samples unless you deliberately override with `FORCE=1`. After the
-learning artifacts are safely written, it removes the active `drafts/<job>.tex`
-workspace copy because `approved/` and `edits/` now hold the archive records.
+`make approve` completes the application record and removes the active
+`drafts/<job>.tex` workspace copy because `approved/` now holds the submitted
+artifact. `make learn` is optional: it does not promote rules without your
+approval. Behavior depends on whether you actually edited the AI draft:
 
-For older completed cycles, you can clean the active draft workspace copy with:
+- **Non-empty diff** (you edited before approving): writes `final-approved.tex`
+  + `diff.patch` + a prefilled `note.md` under `edits/<job>/`, prints the note,
+  and in an interactive terminal asks whether to pass, append a personal
+  `P###` / `L###` rule to `preferences.md`, or leave a canonical candidate for
+  manual review. The prefill is deterministic: it summarizes bullet changes,
+  gap-comment changes, and candidate rule signals.
+- **Empty diff** (AI-only approve, no human edit): short-circuits to a stub
+  `note.md` only. Skips `final-approved.tex`, `diff.patch`, and the promotion
+  review — there is nothing to learn from a no-edit cycle.
+
+`make learn` is meant for current `official` samples and refuses legacy,
+validation, or archive samples unless you deliberately override with `FORCE=1`.
+`FORCE=1 make learn` is also required to downgrade an existing full-format
+learn run into the AI-only stub (e.g. after manually reverting your edits).
+
+For older approved cycles, you can clean the active draft workspace copy with:
 
 ```sh
 make clean-draft JOB=my-first-jd
@@ -129,9 +163,11 @@ make status JOB=my-first-jd
 ```
 
 `status` reports whether the slug is imported, has an active draft, has an AI
-draft snapshot, is approved, and is learned. `checked` is intentionally not stored;
-run `make check JOB=<job>` when you want to validate an active draft. Completed
-cycles may show `drafted: no` after `make learn` cleans the workspace copy.
+draft snapshot, is approved, and has optional learning notes. `checked` is
+intentionally not stored; run `make check JOB=<job>` when you want to validate
+an active draft. Completed cycles normally show `drafted: no` after
+`make approve` cleans the workspace copy. `learned: no` is valid for an
+approved application when there were no reusable edit lessons to record.
 
 Approved samples are classified as:
 
