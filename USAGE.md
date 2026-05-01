@@ -98,15 +98,18 @@ make check JOB=<slug>
 # When everything passes, approve:
 make approve JOB=<slug>
 
-# Generate diff.patch and a prefilled note.md for learning:
+# Optional: generate diff.patch and a prefilled note.md for learning.
+# If the AI draft was approved without any human edit (empty diff), `learn`
+# short-circuits to a stub note.md only — final-approved.tex / diff.patch /
+# promotion review are all skipped.
 make learn JOB=<slug>
 ```
 
-**Order matters.** `make draft` must run before you edit because it creates both the draft and the AI snapshot used by `make learn`. Manual draft insertion is not part of the standard flow.
+**Order matters.** `make draft` must run before you edit because it creates both the draft and the AI snapshot used by optional `make learn`. Manual draft insertion is not part of the standard flow. `make approve` completes the application record; `make learn` is a post-approval memory step for cases where you want to capture edit lessons.
 
 ### Phase 3 — Triage learning into rules
 
-1. Review the `edits/<slug>/note.md` printed by `make learn`, then answer the promotion prompt:
+1. If you ran `make learn`, review the `edits/<slug>/note.md` it printed. For non-empty diff cycles, answer the promotion prompt:
    - **What Changed** — prefilled from the diff; verify the summary
    - **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
    - **Personal Preference Candidates** — your own voice, visual style, or carve-outs over canonical rules
@@ -116,7 +119,8 @@ make learn JOB=<slug>
 2. Press Enter / choose `0` if nothing should be promoted yet.
 3. Choose `1` or `2` to append a personal `P###` or `L###` rule to `preferences.md`.
 4. Choose `3` for canonical candidates; these stay manual because public `C###` rules must pass the 4-criterion test.
-5. Next time the skill runs, it reads both rule layers automatically.
+5. For AI-only cycles, the stub `note.md` is the end of the learning step; no promotion prompt appears.
+6. Next time the skill runs, it reads both rule layers automatically.
 
 ---
 
@@ -134,7 +138,7 @@ These states are derived from files on disk, except `checked`, which is an actio
 | State | Meaning |
 |---|---|
 | `imported` | `jobs/<slug>.md` exists. |
-| `drafted` | `drafts/<slug>.tex` exists as an active working draft. Completed cycles may show `drafted: no` after `make learn` cleans the workspace copy. |
+| `drafted` | `drafts/<slug>.tex` exists as an active working draft. Completed cycles normally show `drafted: no` after `make approve` cleans the workspace copy. |
 | `snapshotted` | `edits/<slug>/ai-draft.tex` exists. This is created by `make draft` before user edits. |
 | `checked` | `make check JOB=<slug>` can pass now. This is not persisted; do not treat it as historical proof. |
 | `approved` | `approved/<slug>/` exists with the approved artifact set. |
@@ -183,7 +187,7 @@ User-editable / preserve-on-replace fields:
 - `Cycle notes`
 - `Legacy note`
 
-`Cycle notes` is initialized or refreshed by `make learn`, but `make approve FORCE=1` should not erase an existing human-curated note path.
+`Cycle notes` may be initialized by `make approve` as an optional learning reminder and is refreshed by `make learn` when learning materials exist. `make approve FORCE=1` should not erase an existing human-curated note path.
 
 ---
 
@@ -197,10 +201,10 @@ User-editable / preserve-on-replace fields:
 | `make preview JOB=<slug>` / `make draft-pdf JOB=<slug>` | Compile active `drafts/<slug>.tex` → `build/pdf/drafts/<slug>.pdf`. Used by `check`. |
 | `make approved JOB=<slug>` | Compile `approved/<slug>/<slug>.tex` → `build/pdf/approved/<slug>.pdf`. |
 | `make check JOB=<slug>` | Compiles + runs validators via `scripts/cycle.py`. Fails on any violation. |
-| `make approve JOB=<slug>` | Runs `check` first, then copies the internal audit `.tex` + `.pdf` into `approved/<slug>/`, auto-generates `<slug>.public.tex`, and writes `metadata.md`. |
+| `make approve JOB=<slug>` | Runs `check` first, then copies the internal audit `.tex` + `.pdf` into `approved/<slug>/`, auto-generates `<slug>.public.tex`, writes `metadata.md`, and removes the active `drafts/<slug>.tex` workspace copy. |
 | `make export JOB=<slug>` | Generates `approved/<slug>/<slug>.public.tex` from the internal approved `.tex` by stripping `% src:` / `% TODO:` comments. Use `FORCE=1` to regenerate. |
-| `make learn JOB=<slug>` | Generates `edits/<slug>/final-approved.tex` + `diff.patch` + a prefilled `note.md`, prints the note, asks whether to promote a personal `P###` / `L###` rule, updates metadata, then removes the active `drafts/<slug>.tex` workspace copy. Refuses non-official samples unless `FORCE=1`. |
-| `make clean-draft JOB=<slug>` | Safely removes `drafts/<slug>.tex` only after approved and learned artifacts exist. Useful for old cycles created before automatic cleanup. |
+| `make learn JOB=<slug>` | Optional post-approval memory step. Two paths: (a) **non-empty diff** — generates `edits/<slug>/final-approved.tex` + `diff.patch` + a prefilled `note.md`, prints the note, asks whether to promote a personal `P###` / `L###` rule. (b) **empty diff (AI-only approve)** — short-circuits to a stub `note.md` only; skips `final-approved.tex`, `diff.patch`, and the promotion review since there's nothing to learn. Both paths update metadata and refuse non-official samples unless `FORCE=1`. To downgrade a previously full-format learn into a stub (e.g. you re-ran after manually reverting your edits), use `FORCE=1`. |
+| `make clean-draft JOB=<slug>` | Safely removes `drafts/<slug>.tex` after an approved artifact exists. Useful for old cycles created before automatic cleanup. |
 | `make abort JOB=<slug>` | Terminates an unsuitable unapproved cycle and removes `jobs/<slug>.md`, `jobs/_sources/<slug>/`, `drafts/<slug>.tex`, `edits/<slug>/`, and draft build artifacts. Refuses if `approved/<slug>/` exists. |
 | `make status JOB=<slug>` | Reports lifecycle state, sample class, metadata issues, and non-persisted `checked` guidance for one slug. |
 | `make check-all` | Compiles and validates every current `official` approved artifact; skips `legacy`, `validation-sample`, and `archive`. |
@@ -222,16 +226,16 @@ audit `.tex`.
 ### Active draft cleanup
 
 `drafts/` is an active workspace, not the long-term archive. After `make approve`
-and `make learn` succeed, the approved resume already exists in `approved/` and
-the learning snapshot exists in `edits/<slug>/final-approved.tex`. At that point
-`make learn` removes `drafts/<slug>.tex` so old completed cycles do not clutter
-the active draft folder.
+succeeds, the approved resume already exists in `approved/`, so `make approve`
+removes `drafts/<slug>.tex` to keep the active draft folder focused on in-progress
+work.
 
 For completed cycles, `make status` may therefore show `drafted: no` while
-`approved: yes` and `learned: yes`. That is expected.
+`approved: yes`. `learned: no` is also valid when you chose not to run the
+optional learning step.
 
 For older cycles created before this cleanup behavior, run
-`make clean-draft JOB=<slug>` after confirming the cycle is approved and learned.
+`make clean-draft JOB=<slug>` after confirming the cycle is approved.
 
 If a JD turns out to be a poor fit before approval, terminate the active cycle:
 

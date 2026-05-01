@@ -335,7 +335,7 @@ def approve(args: argparse.Namespace) -> None:
         "Company": "TODO",
         "Result": "TODO (update post-interview / rejection / offer for future reference)",
         "Compiled PDF": f"`{job}.pdf` (generated via `make approve JOB={job}`)",
-        "Cycle notes": f"pending — run `make learn JOB={job}` after approval notes are ready.",
+        "Cycle notes": f"optional — run `make learn JOB={job}` only when you want to record edit diffs or promote reusable lessons.",
     }
     if force:
         existing_fields = metadata_fields(dst_dir / "metadata.md")
@@ -370,6 +370,8 @@ def approve(args: argparse.Namespace) -> None:
 """
     write_new(dst_dir / "metadata.md", metadata, force=force)
     print(f"Approved artifact ready: {rel(dst_dir)}")
+    if clean_active_draft_after_approval(job):
+        print(f"- cleaned active draft: {rel(draft_tex(job))}")
 
 
 def is_internal_comment(line: str) -> bool:
@@ -793,21 +795,44 @@ When you've decided what to promote, run through this checklist:
 """
 
 
-def clean_active_draft_after_learn(job: str) -> bool:
-    required_paths = (
-        existing_approved_tex_for_job(job),
-        edits_dir(job) / "final-approved.tex",
-        edits_dir(job) / "diff.patch",
-        edits_dir(job) / "note.md",
-    )
-    for path in required_paths:
-        ensure_exists(path, "learn artifact")
-
+def clean_active_draft_after_approval(job: str) -> bool:
+    ensure_exists(existing_approved_tex_for_job(job), "approved tex")
     path = draft_tex(job)
     if not path.exists():
         return False
     path.unlink()
     return True
+
+
+def generate_ai_only_stub_note(job: str, approved_sample: Path | None) -> str:
+    sample_dir = approved_sample if approved_sample else approved_dir(job)
+    approved_rel = rel(sample_dir)
+    return f"""# Edits Note — {job} (AI-only cycle)
+
+## Context
+
+- Cycle status: AI-only approve. Approved artifact in `{approved_rel}/`.
+- AI snapshot: `edits/{job}/ai-draft.tex`
+- Diff vs final approved: empty (no human edit between AI draft and submission).
+- This cycle does not contribute to the memory loop. Redundant `final-approved.tex` and `diff.patch` were skipped to keep `edits/` clean.
+
+## Why this short-circuit fired
+
+`make learn` produced no text diff between `ai-draft.tex` and the approved `.tex`. Either:
+- The AI draft was accepted as-is, or
+- The cycle was used as a pipeline / validation run rather than a real edit cycle.
+
+## What this means
+
+- No personal preference (`P###` / `L###`) candidate to promote.
+- No canonical rule (`C###`) candidate to promote.
+- The approved artifact still counts as a submission record under `approved/<slug>/`.
+- If you later hand-edit `approved/{job}/{job}.tex` and re-run `FORCE=1 make learn JOB={job}`, this stub is replaced with a full diff-driven note and the skipped artifacts are recreated.
+
+## Open questions
+
+- Application outcome / result: update `approved/{job}/metadata.md` when you get interview / rejection / offer feedback.
+"""
 
 
 def learn(args: argparse.Namespace) -> None:
@@ -831,8 +856,6 @@ def learn(args: argparse.Namespace) -> None:
     ensure_exists(ai_path, "cycle snapshot")
     ensure_exists(final_path, "approved tex")
 
-    copy_new(final_path, final_copy, force=force)
-
     ai_lines = ai_path.read_text(encoding="utf-8").splitlines(keepends=True)
     final_lines = final_path.read_text(encoding="utf-8").splitlines(keepends=True)
     diff = "".join(
@@ -843,12 +866,36 @@ def learn(args: argparse.Namespace) -> None:
             tofile=rel(final_path),
         )
     )
-    write_new(diff_path, diff or "# No text diff detected.\n", force=force)
 
-    note_content = generate_note(job, diff or "# No text diff detected.\n", approved_sample)
+    if not diff.strip():
+        for stale in (final_copy, diff_path):
+            if stale.exists():
+                if not force:
+                    fail(
+                        f"Refusing to remove existing {rel(stale)} on AI-only short-circuit. "
+                        "Use FORCE=1 to replace a previously full-format learn run with the AI-only stub."
+                    )
+                stale.unlink()
+        note_content = generate_ai_only_stub_note(job, approved_sample)
+        write_new(note_path, note_content, force=force)
+        update_metadata_cycle_notes(job)
+        draft_cleaned = clean_active_draft_after_approval(job)
+        print(f"Learning materials ready (AI-only short-circuit): {rel(edits_dir(job))}")
+        if draft_cleaned:
+            print(f"- cleaned active draft: {rel(draft_tex(job))}")
+        print(f"- skipped: {rel(final_copy)} (would equal {rel(final_path)} byte-for-byte)")
+        print(f"- skipped: {rel(diff_path)} (no human edit detected)")
+        print(f"\n--- {rel(note_path)} ---")
+        print(note_content.rstrip())
+        print(f"--- end {rel(note_path)} ---")
+        return
+
+    copy_new(final_path, final_copy, force=force)
+    write_new(diff_path, diff, force=force)
+    note_content = generate_note(job, diff, approved_sample)
     write_new(note_path, note_content, force=force)
     update_metadata_cycle_notes(job)
-    draft_cleaned = clean_active_draft_after_learn(job)
+    draft_cleaned = clean_active_draft_after_approval(job)
     print(f"Learning materials ready: {rel(edits_dir(job))}")
     if draft_cleaned:
         print(f"- cleaned active draft: {rel(draft_tex(job))}")
@@ -860,7 +907,7 @@ def learn(args: argparse.Namespace) -> None:
 
 def clean_draft(args: argparse.Namespace) -> None:
     job = require_job(args)
-    if clean_active_draft_after_learn(job):
+    if clean_active_draft_after_approval(job):
         print(f"Active draft cleaned: {rel(draft_tex(job))}")
     else:
         print(f"Active draft already absent: {rel(draft_tex(job))}")
@@ -927,6 +974,7 @@ def status(args: argparse.Namespace) -> None:
 
     issues: list[str] = []
     warnings: list[str] = []
+    notes: list[str] = []
 
     status_value = fields.get("Status")
     if status_value and status_value not in ALLOWED_SAMPLE_STATUSES:
@@ -948,7 +996,7 @@ def status(args: argparse.Namespace) -> None:
     if lifecycle["learned"] and not lifecycle["snapshotted"]:
         warnings.append("learned note exists but AI draft snapshot is missing; learning may be manual/reconstructed")
     if lifecycle["approved"] and not lifecycle["learned"] and sample_class == "official":
-        warnings.append("official sample is approved but not learned")
+        notes.append("learning note not present; `make learn` is optional after approval")
 
     print(f"Status: {job}")
     print("- lifecycle:")
@@ -956,8 +1004,8 @@ def status(args: argparse.Namespace) -> None:
         print(f"  - {name}: {yes_no(lifecycle[name])}")
     if lifecycle["drafted"]:
         print("  - checked: not persisted; run `make check JOB={}` to evaluate the active draft now".format(job))
-    elif lifecycle["approved"] and lifecycle["learned"]:
-        print("  - checked: active draft cleaned after learn; run `make check-all` to validate approved artifacts")
+    elif lifecycle["approved"]:
+        print("  - checked: active draft absent; run `make check-all` to validate approved artifacts")
     else:
         print("  - checked: unavailable; active draft is missing")
     print("- sample:")
@@ -974,6 +1022,10 @@ def status(args: argparse.Namespace) -> None:
     if warnings:
         print("- warnings:")
         for item in warnings:
+            print(f"  - {item}")
+    if notes:
+        print("- notes:")
+        for item in notes:
             print(f"  - {item}")
     if not issues and not warnings:
         print("- issues: none")

@@ -238,14 +238,14 @@ Fix the failures in the editor, re-run `make check`, repeat until it says `Check
 
 `make check` validates the current draft only. It does not prove the already-approved corpus is healthy; use `make check-all` after approval for that.
 
-### 6e. Approve and learn
+### 6e. Approve, then optionally learn
 
 ```bash
 make approve JOB=my-first-jd
 make learn JOB=my-first-jd
 ```
 
-`approve` re-runs `check` as a dependency (so you can't approve a broken draft), then copies the internal audit `.tex` + `.pdf` into `approved/my-first-jd/`, auto-generates `my-first-jd.public.tex`, and writes `metadata.md`.
+`approve` re-runs `check` as a dependency (so you can't approve a broken draft), then copies the internal audit `.tex` + `.pdf` into `approved/my-first-jd/`, auto-generates `my-first-jd.public.tex`, writes `metadata.md`, and removes the active `drafts/my-first-jd.tex` workspace copy.
 
 Inside `approved/my-first-jd/`:
 
@@ -253,15 +253,15 @@ Inside `approved/my-first-jd/`:
 - `my-first-jd.public.tex` strips those comments and is the version to share if anyone asks for LaTeX source.
 - `my-first-jd.pdf` is the normal application PDF.
 
-`learn` compares `edits/.../ai-draft.tex` against the approved version, produces a unified `diff.patch`, writes a prefilled `note.md`, and prints the note so you can review the suggested triage immediately. After those learning artifacts exist, it removes `drafts/my-first-jd.tex`; `drafts/` is only the active workspace.
+`learn` is optional. Use it when you made meaningful edits or want to record that a draft was accepted as-is. It compares `edits/.../ai-draft.tex` against the approved version. If the diff is non-empty (you edited the AI draft before approving), it produces `final-approved.tex`, a unified `diff.patch`, and a prefilled `note.md`, prints the note, and asks whether to promote a personal `P###` / `L###` rule. If the diff is empty (AI-only approve), it short-circuits: only a stub `note.md` is written, and `final-approved.tex` / `diff.patch` / the promotion review are all skipped — there's nothing to learn from a no-edit cycle.
 
 `learn` is meant for current official samples. It refuses `legacy`, `validation-sample`, and `archive` samples unless you deliberately override with `FORCE=1`.
 
-If you are cleaning an older cycle created before automatic cleanup existed, use `make clean-draft JOB=<slug>` after `approved` and `learned` are both present.
+If you are cleaning an older cycle created before automatic cleanup existed, use `make clean-draft JOB=<slug>` after `approved` is present.
 
 ### 6f. Triage stable patterns into rules
 
-Review the `edits/my-first-jd/note.md` that `make learn` printed. The first pass is prefilled from the diff; edit the sections when your judgement disagrees:
+If you ran `make learn`, review the `edits/my-first-jd/note.md` it printed. The first pass is prefilled from the diff; edit the sections when your judgement disagrees:
 
 - **What Changed** — verify the generated summary of substantive edits
 - **Canonical Rule Candidates** — rules that may generalise across users, stacks, domains, and seniority levels
@@ -271,7 +271,7 @@ Review the `edits/my-first-jd/note.md` that `make learn` printed. The first pass
 - **Manual Promotion Checklist** — final human review before changing rule files
 - **Open Questions** — things to revisit after interview / rejection / offer
 
-After printing the note, `make learn` asks whether to promote anything:
+For non-empty diff cycles, after printing the note, `make learn` asks whether to promote anything. For AI-only cycles, the stub `note.md` is the end of the learning step:
 
 - Press Enter / choose `0` to pass for now.
 - Choose `1` to append a personal content rule (`P###`) to `preferences.md`.
@@ -298,7 +298,7 @@ For each universal entry you decide to promote, add it to the skill's mirrored `
 
 ### 6g. Inspect status and validate official samples
 
-After approval and learning, inspect the slug:
+After approval, inspect the slug:
 
 ```bash
 make status JOB=my-first-jd
@@ -306,8 +306,9 @@ make status JOB=my-first-jd
 
 You should see:
 
-- `imported`, `snapshotted`, `approved`, and `learned` as `yes`
-- `drafted` may be `no` after `make learn` cleans the active workspace draft
+- `imported`, `snapshotted`, and `approved` as `yes`
+- `drafted` should normally be `no` after `make approve` cleans the active workspace draft
+- `learned` may be `yes` or `no`; learning is optional after approval
 - sample class `official`
 - no metadata issues
 
