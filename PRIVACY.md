@@ -18,7 +18,7 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `scripts/import_job.py` | JD import helper; no personal data baked into source | ✅ Yes |
 | `scripts/cycle.py` | Cycle helper | ✅ Yes |
 | `scripts/__pycache__/` | Python bytecode | ❌ Never (gitignore) |
-| `README.md`, `USAGE.md`, `PRIVACY.md` | Generic documentation | ✅ Yes |
+| `README.md`, `GUIDE.md`, `PRIVACY.md`, `ROADMAP.md` | Generic documentation and product planning | ✅ Yes |
 | `raw/code/_TEMPLATE.md` | Blank repo-note template | ✅ Yes |
 | `raw/resumes/*.pdf` | Your personal resume, PII throughout | ❌ Never |
 | `raw/code/*.md` (filled) | Real project descriptions, supervisor names, mentor identity, grades | ❌ Never |
@@ -57,7 +57,8 @@ Makefile
 scripts/import_job.py
 scripts/cycle.py
 README.md
-USAGE.md
+GUIDE.md
+ROADMAP.md
 PRIVACY.md
 raw/code/_TEMPLATE.md
 .gitignore
