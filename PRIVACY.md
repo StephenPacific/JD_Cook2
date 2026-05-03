@@ -22,6 +22,7 @@ This file maps every directory to a **share status** and gives two publishing pa
 | `raw/code/_TEMPLATE.md` | Blank repo-note template | ✅ Yes |
 | `raw/resumes/*.pdf` | Your personal resume, PII throughout | ❌ Never |
 | `raw/code/*.md` (filled) | Real project descriptions, supervisor names, mentor identity, grades | ❌ Never |
+| `raw/.cache/` | Derived text extracted from private PDF evidence + raw manifest | ❌ Never (gitignored) |
 | `jobs/*.md` | JD text (may be company IP) + links to real companies | ❌ Never |
 | `jobs/_sources/<slug>/*` | Clipboard/web snapshots, rendered text, screenshots, URL metadata | ❌ Never |
 | `jd_search/README.md`, `jd_search/search_jobs.py`, `jd_search/import_result.py`, `jd_search/profiles/example.json` | Search framework + sanitized profile template | ✅ Yes |
@@ -70,6 +71,7 @@ raw/code/_TEMPLATE.md
 raw/resumes/
 raw/code/*.md
 !raw/code/_TEMPLATE.md
+raw/.cache/
 jobs/
 # includes jobs/_sources/<slug>/ import snapshots
 drafts/

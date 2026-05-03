@@ -258,6 +258,7 @@ make check-all
 raw/                                                      user evidence
   resumes/                                               past resumes
   code/                                                  project notes
+  .cache/                                                derived PDF text cache (gitignored)
 jobs/                                                     one JD per slug
   _sources/<slug>/                                       import snapshots
 drafts/                                                   active editable drafts
@@ -276,7 +277,7 @@ inputs:        raw/ + jobs/ + preferences.md + skill rules
 active work:   drafts/
 final record:  approved/
 learning:      edits/ + preferences.md
-cache:         build/ + jd_search/searches/
+cache:         raw/.cache/ + build/ + jd_search/searches/
 ```
 
 ### 8. Make Commands
@@ -285,7 +286,8 @@ cache:         build/ + jd_search/searches/
 |---|---|
 | `make import-job JOB=<slug> FROM=clipboard` | Reads clipboard text and writes `jobs/<slug>.md` plus `jobs/_sources/<slug>/`. |
 | `make import-job JOB=<slug> URL="..." MODE=http/js` | Imports a public JD URL. Omitting `MODE` uses `auto`. `MODE=js` requires Playwright. |
-| `make draft JOB=<slug>` | Writes `edits/<slug>/context.md`, invokes the local agent, writes `drafts/<slug>.tex`, then snapshots it to `edits/<slug>/ai-draft.tex`. |
+| `make draft JOB=<slug>` | Refreshes `raw/.cache/`, writes `edits/<slug>/context.md`, invokes the local agent, writes `drafts/<slug>.tex`, then snapshots it to `edits/<slug>/ai-draft.tex`. |
+| `make raw-cache` | Refreshes derived PDF text caches and `raw/.cache/MANIFEST.md` without drafting. Mostly useful for debugging. |
 | `make preview JOB=<slug>` / `make draft-pdf JOB=<slug>` | Compiles active draft to `build/pdf/drafts/<slug>.pdf`. |
 | `make approved JOB=<slug>` | Compiles `approved/<slug>/<slug>.tex` to `build/pdf/approved/<slug>.pdf`. |
 | `make check JOB=<slug>` | Compiles and validates the active draft. |
