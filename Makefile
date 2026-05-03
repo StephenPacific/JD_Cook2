@@ -29,7 +29,7 @@ LATEX_OUT := $(OUT_ROOT)/latex/$(SCOPE)/$(JOB)
 PDF_OUT := $(OUT_ROOT)/pdf/$(SCOPE)
 PDF := $(PDF_OUT)/$(JOB).pdf
 
-.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result check approve export learn clean-draft abort status check-all
+.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result check approve export learn clean-draft abort status check-all raw-cache
 
 pdf:
 	@test -f "$(SRC)" || (echo "Missing source: $(SRC)" >&2; exit 1)
@@ -89,3 +89,6 @@ status:
 
 check-all:
 	$(PYTHON) scripts/cycle.py check-all
+
+raw-cache:
+	$(PYTHON) scripts/raw_cache.py $(if $(FORCE),--force)

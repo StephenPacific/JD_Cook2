@@ -264,6 +264,11 @@ def validate_resume_artifact(
             errors.append(f"Line {idx}: % src must not point to approved/: {stripped}")
         if "latex-template.tex" in stripped:
             errors.append(f"Line {idx}: % src must not point to latex-template.tex.")
+        if "raw/.cache" in stripped:
+            errors.append(
+                f"Line {idx}: % src must not point to raw/.cache/ (it is a derived reading aid). "
+                "Cite the original source under raw/."
+            )
 
     if r"\mid" in text:
         errors.append(r"Found \mid in LaTeX body/template; use text-safe \textbar{} separators.")

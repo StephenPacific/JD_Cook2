@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from raw_cache import ensure_raw_cache
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONTEXT_LIMIT = 2
@@ -467,6 +469,7 @@ def draft(args: argparse.Namespace) -> None:
         fail("--context-threshold must be 0 or greater.")
 
     agent = choose_agent(args.agent)
+    ensure_raw_cache(quiet=False)
     job_text = job_path.read_text(encoding="utf-8")
     draft_context, selected_examples = write_context_file(
         job,
