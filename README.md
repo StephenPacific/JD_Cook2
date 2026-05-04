@@ -81,16 +81,22 @@ Most of those directories contain personal data and are gitignored. See
 
 ## Job Search
 
-JDcook includes an optional discovery layer:
+JDcook includes an optional discovery layer that scans job boards, runs every
+candidate through an LLM-as-judge triage, and writes a curated inbox:
 
 ```bash
 python3 -m pip install -U python-jobspy
-make match-jobs SEARCH=raw-fit
-make import-search-result SEARCH=raw-fit RANK=1 JOB=my-target-job
+make scan-jobs SEARCH=daily             # 1. JobSpy + hard filter + auto-triage
+make inbox                              # 2. read jd_search/inbox.md
+make draft JOB=<slug> FROM=inbox        # 3. import + gate + draft
 ```
 
-Search reads `raw/`, generates a local profile, ranks jobs locally, and imports
-selected results into the normal `jobs/<slug>.md` workflow. Details live in
+The pipeline reads `raw/` for the profile, applies a deterministic
+visa/seniority hard filter, asks Codex/Claude to judge the rest semantically,
+and lists only `APPLY` / `BORDERLINE` candidates in the inbox. Drafting is
+never automatic — you pick from the inbox and trigger `make draft` yourself.
+
+Details and the legacy `import-search-result` flow live in
 [jd_search/README.md](jd_search/README.md).
 
 ## Documentation

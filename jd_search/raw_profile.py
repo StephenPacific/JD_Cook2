@@ -11,16 +11,53 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOCATIONS = ["Sydney NSW", "Remote Australia"]
 DEFAULT_COUNTRY = "Australia"
+# Roles always added to target_roles, regardless of raw-evidence match.
+# Use this for "broaden" roles the user wants to scan for even though raw
+# does not directly demonstrate the skillset (e.g. PM-type roles where the
+# JD explicitly values cross-functional / technical translation work).
+DEFAULT_BROADEN_ROLES = [
+    "Technical Product Manager",
+    "Solutions Engineer",
+    "Quant Developer",
+]
 DEFAULT_AVOID_KEYWORDS = [
+    # ─── Hard rules only. Subjective "is this role a fit" judgements live
+    # in the LLM triage layer, not here. Regex only kills JDs the user
+    # *cannot* apply to (visa) or *cannot* qualify for (gross seniority
+    # mismatch). Everything else goes through, even helpdesk / sales /
+    # construction-domain roles — the triage judge gets to decide.
+    #
+    # ─── Seniority kills (title-anchored via TITLE_ONLY_AVOID_KEYWORDS
+    # in search_jobs.py — won't kill a junior JD that just mentions
+    # "reports to manager" in passing) ───
     "manager",
     "principal",
     "staff",
     "staff engineer",
     "lead engineer",
     "director",
-    "sales",
-    "unpaid",
+    "head of",
+
+    # ─── Body-text seniority kills (years-of-experience minimums the user
+    # provably cannot meet) ───
+    "5+ years",
+    "5 or more years",
+    "7+ years",
+    "10+ years",
+
+    # ─── Visa hard kills (deterministic, not LLM-judgable, not
+    # negotiable) ───
+    "australian citizen",
+    "australian citizenship",
+    "permanent resident",
+    "pr required",
+    "must hold pr",
+    "agsva",
+    "nv1",
+    "nv2",
+    "baseline clearance",
     "security clearance",
+    "continuous australian residency",
 ]
 
 SKILL_PATTERNS: dict[str, list[str]] = {
@@ -110,6 +147,28 @@ ROLE_RULES: dict[str, list[str]] = {
         r"\btesting\b",
         r"\bworkflow\b",
     ],
+    "Technical Product Manager": [
+        r"technical product manager",
+        r"\btpm\b",
+        r"product manager.{0,20}(engineering|technical|developer|api|platform|infrastructure)",
+    ],
+    "Solutions Engineer": [
+        r"solutions engineer",
+        r"forward[- ]deployed",
+        r"sales engineer",
+        r"customer engineer",
+    ],
+    "Developer Relations": [
+        r"developer relations",
+        r"\bdevrel\b",
+        r"developer advocate",
+    ],
+    "Quant Developer": [
+        r"\bquant(itative)?\b.{0,20}(developer|engineer|analyst)",
+        r"trading systems",
+        r"order book",
+        r"market microstructure",
+    ],
 }
 
 EVIDENCE_PATTERNS: dict[str, list[str]] = {
@@ -156,9 +215,20 @@ def read_raw_documents(raw_root: Path) -> tuple[str, list[dict[str, Any]], list[
     if not raw_root.exists():
         return "", sources, [f"Raw root does not exist: {rel(raw_root)}"]
 
+    # raw/.cache/ holds derived PDF text caches + MANIFEST. They are reading
+    # aids, not source-of-truth raw evidence; including them in the generated
+    # profile would double-count the same content and pollute target_roles
+    # with manifest/cache vocabulary. Same exclusion as cycle.py's % src guard.
+    cache_dir = (raw_root / ".cache").resolve()
+
     for path in sorted(raw_root.rglob("*")):
         if not path.is_file() or path.name.startswith(".") or path.name == "_TEMPLATE.md":
             continue
+        try:
+            if path.resolve().is_relative_to(cache_dir):
+                continue
+        except (OSError, ValueError):
+            pass
         text = ""
         if path.suffix.lower() in {".md", ".txt", ".tex"}:
             text = path.read_text(encoding="utf-8", errors="ignore")
@@ -221,6 +291,16 @@ def build_profile_from_raw(
 
     strong, usable = infer_skills(text)
     roles = infer_roles(text)
+    # Always merge in DEFAULT_BROADEN_ROLES so JobSpy still scans for these
+    # JD types even when raw evidence does not directly demonstrate them.
+    # Order: evidence-derived roles first (highest signal), then broaden roles.
+    seen_roles: set[str] = set()
+    merged_roles: list[str] = []
+    for role in roles + DEFAULT_BROADEN_ROLES:
+        if role.lower() not in seen_roles:
+            seen_roles.add(role.lower())
+            merged_roles.append(role)
+    roles = merged_roles
     evidence = infer_evidence_keywords(text)
     return {
         "profile_name": "generated-from-raw",

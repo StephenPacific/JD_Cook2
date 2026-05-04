@@ -45,6 +45,9 @@ jd_search/searches/
 jd_search/decisions.tsv
 jd_search/decisions.md
 jd_search/persona.md
+jd_search/seen.tsv
+jd_search/inbox.md
+jd_search/inbox/
 
 # Personal LaTeX template override — kept local only, has real PII baked in.
 # The public `latex-template.tex` uses placeholders; the skill prefers this

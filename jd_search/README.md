@@ -3,30 +3,53 @@
 `jd_search` is the job-discovery layer for JDcook. It keeps search, ranking, and
 candidate selection separate from the resume drafting cycle.
 
-The intended flow is:
+## Recommended flow (Phase 2 — scan → triage → inbox)
 
 ```text
-raw/
-  -> generated local profile
-  -> query plan
-  -> JobSpy search
-  -> normalized job records
-  -> profile-aware ranking
-  -> shortlist
-  -> selected result imported to jobs/<slug>.md
-  -> existing JDcook draft/check/approve/learn cycle
+make scan-jobs SEARCH=daily            # 1. JobSpy + hard filter + auto-triage
+make inbox                              # 2. read jd_search/inbox.md
+make draft JOB=<slug> FROM=inbox        # 3. import + gate (cache hit) + draft
+make check / approve / learn            # 4. standard cycle
 ```
+
+`make scan-jobs` chains `match-jobs` (JobSpy) with `scripts/scan_to_inbox.py`,
+which:
+
+1. reads the ranked results,
+2. skips URLs already triaged (cross-run dedup via `seen.tsv`),
+3. runs the LLM triage judge (`triage.py`) on the top-N candidates,
+4. writes the JD body to `jd_search/inbox/<slug>.md` for `FROM=inbox` import,
+5. regenerates `jd_search/inbox.md` showing only `APPLY` / `BORDERLINE` (SKIP /
+   VISA-BLOCKED entries are kept in `jd_search/decisions.tsv` for audit).
+
+The pipeline deliberately stops at `inbox.md`. Drafting is never automatic;
+the user reviews the inbox and triggers `make draft JOB=<slug> FROM=inbox`
+themselves. The drafting gate hits the cached triage verdict instantly.
+
+## Legacy flow (single ranked-result import)
+
+`make import-search-result SEARCH=<search> RANK=N JOB=<slug>` still imports
+one ranked entry into `jobs/<slug>.md`. Useful when you want to bypass the
+inbox layer and pick by raw match-score rank.
 
 ## Files
 
 - `profiles/example.json` — safe template for a user profile.
 - `profiles/generated-from-raw.json` — local cache produced by `match-jobs`,
   gitignored.
-- `raw_profile.py` — local, heuristic profile builder from `raw/`.
-- `search_jobs.py` — builds a query plan and, when `python-jobspy` is installed,
-  searches job boards and writes ranked results.
-- `import_result.py` — imports one ranked result into `jobs/<slug>.md`.
-- `searches/<search>/` — local output directory, gitignored.
+- `raw_profile.py` — local, heuristic profile builder from `raw/`. Reads
+  `raw/code/`, `raw/resumes/`, etc., but skips `raw/.cache/` (derived).
+- `search_jobs.py` — builds a query plan and, when `python-jobspy` is
+  installed, searches job boards and writes ranked results.
+- `import_result.py` — legacy: imports one ranked result into `jobs/<slug>.md`.
+- `triage.py` — LLM-as-judge for single JDs (Phase 1).
+- `persona.md` — natural-language persona for the LLM judge (gitignored;
+  must live outside `raw/` so the drafting skill cannot cite it as evidence).
+- `searches/<search>/` — local raw + ranked output, gitignored.
+- `inbox.md` — auto-generated candidate list (gitignored).
+- `inbox/<slug>.md` — staged JD bodies for `FROM=inbox` import (gitignored).
+- `seen.tsv` — cross-run URL dedup; tracks last-seen verdict (gitignored).
+- `decisions.tsv` / `decisions.md` — full triage decision audit (gitignored).
 
 ## Profile Contract
 

@@ -12,7 +12,12 @@ PROFILE_OUT ?= jd_search/profiles/generated-from-raw.json
 RAW_ROOT ?= raw
 QUERY ?=
 LOCATION ?=
-SITES ?= indeed,linkedin,glassdoor,google
+SITES ?= indeed,linkedin,google
+# Glassdoor dropped: their unauthenticated location lookup endpoint
+# (`findPopularLocationAjax.htm`) returns 403 to all queries since ~2024,
+# so JobSpy can't resolve any location ID and every Glassdoor call fails
+# with "location not parsed". Re-add it manually if/when JobSpy ships an
+# updated Glassdoor adapter.
 RESULTS_WANTED ?= 10
 HOURS_OLD ?= 168
 MAX_QUERIES ?= 8
@@ -21,6 +26,8 @@ DRY_RUN ?=
 TRIAGE_AGENT ?= codex
 SECOND_TRIAGE_AGENT ?=
 PERSONA ?= jd_search/persona.md
+TOP_N ?= 25
+LINKEDIN_FETCH ?= 1
 
 ifeq ($(SCOPE),approved)
 SRC := approved/$(JOB)/$(JOB).tex
@@ -37,7 +44,7 @@ LATEX_OUT := $(OUT_ROOT)/latex/$(SCOPE)/$(JOB)
 PDF_OUT := $(OUT_ROOT)/pdf/$(SCOPE)
 PDF := $(PDF_OUT)/$(JOB).pdf
 
-.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result triage check approve export learn clean-draft abort status check-all raw-cache
+.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result triage scan-jobs inbox check approve export learn clean-draft abort status check-all raw-cache
 
 pdf:
 	@test -f "$(SRC)" || (echo "Missing source: $(SRC)" >&2; exit 1)
@@ -66,7 +73,7 @@ plan-jobs:
 	$(PYTHON) jd_search/search_jobs.py --profile "$(PROFILE)" --search "$(SEARCH)" --sites "$(SITES)" --results-wanted "$(RESULTS_WANTED)" --hours-old "$(HOURS_OLD)" --max-queries "$(MAX_QUERIES)" $(if $(QUERY),--query "$(QUERY)") $(if $(LOCATION),--location "$(LOCATION)") --dry-run $(if $(FORCE),--force)
 
 match-jobs:
-	$(PYTHON) jd_search/search_jobs.py --profile-from-raw --raw-root "$(RAW_ROOT)" --profile-out "$(PROFILE_OUT)" --search "$(SEARCH)" --sites "$(SITES)" --results-wanted "$(RESULTS_WANTED)" --hours-old "$(HOURS_OLD)" --max-queries "$(MAX_QUERIES)" $(if $(QUERY),--query "$(QUERY)") $(if $(LOCATION),--location "$(LOCATION)") $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
+	$(PYTHON) jd_search/search_jobs.py --profile-from-raw --raw-root "$(RAW_ROOT)" --profile-out "$(PROFILE_OUT)" --search "$(SEARCH)" --sites "$(SITES)" --results-wanted "$(RESULTS_WANTED)" --hours-old "$(HOURS_OLD)" --max-queries "$(MAX_QUERIES)" $(if $(filter-out 0 false no off,$(LINKEDIN_FETCH)),--linkedin-fetch-description) $(if $(QUERY),--query "$(QUERY)") $(if $(LOCATION),--location "$(LOCATION)") $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
 
 search-jobs:
 	$(PYTHON) jd_search/search_jobs.py --profile "$(PROFILE)" --search "$(SEARCH)" --sites "$(SITES)" --results-wanted "$(RESULTS_WANTED)" --hours-old "$(HOURS_OLD)" --max-queries "$(MAX_QUERIES)" $(if $(QUERY),--query "$(QUERY)") $(if $(LOCATION),--location "$(LOCATION)") $(if $(FORCE),--force)
@@ -76,6 +83,13 @@ import-search-result:
 
 triage:
 	$(PYTHON) jd_search/triage.py --agent "$(TRIAGE_AGENT)" --persona "$(PERSONA)" $(if $(SECOND_TRIAGE_AGENT),--second-agent "$(SECOND_TRIAGE_AGENT)") $(if $(URL),--url "$(URL)") $(if $(FILE),--file "$(FILE)") $(if $(FROM),--from "$(FROM)") $(TRIAGE_JOB_ARG) $(if $(FORCE),--refresh) $(if $(NO_CACHE),--no-cache)
+
+scan-jobs:
+	$(MAKE) match-jobs SEARCH="$(SEARCH)" $(if $(QUERY),QUERY="$(QUERY)") $(if $(LOCATION),LOCATION="$(LOCATION)") $(if $(SITES),SITES="$(SITES)") $(if $(RESULTS_WANTED),RESULTS_WANTED="$(RESULTS_WANTED)") $(if $(HOURS_OLD),HOURS_OLD="$(HOURS_OLD)") $(if $(FORCE),FORCE=1)
+	$(PYTHON) scripts/scan_to_inbox.py --search "$(SEARCH)" --top-n "$(TOP_N)" --agent "$(TRIAGE_AGENT)" --persona "$(PERSONA)" $(if $(REJUDGE),--rejudge)
+
+inbox:
+	@if [ -f jd_search/inbox.md ]; then cat jd_search/inbox.md; else echo "No inbox yet. Run \`make scan-jobs SEARCH=<slug>\` first."; fi
 
 check: draft-pdf
 	$(PYTHON) scripts/cycle.py check --job "$(JOB)"

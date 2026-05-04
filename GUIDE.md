@@ -298,10 +298,16 @@ cache:         raw/.cache/ + build/ + jd_search/searches/
 | `make abort JOB=<slug>` | Removes an unapproved imported cycle. Refuses when approved artifacts exist. |
 | `make status JOB=<slug>` | Reports lifecycle state, sample class, metadata issues, and check guidance. |
 | `make check-all` | Compiles and validates every current official approved artifact. |
-| `make match-jobs SEARCH=<slug>` | Builds a raw-driven profile, runs JobSpy, ranks results, and writes a shortlist. |
-| `make import-search-result SEARCH=<slug> RANK=1 JOB=<job>` | Imports one ranked search result into the normal `jobs/<job>.md` workflow. |
+| `make triage FROM=clipboard` | Triage one JD via the LLM judge. Accepts `URL=`, `FILE=`, `JOB=`, or pipe via stdin. |
+| `make match-jobs SEARCH=<slug>` | Builds a raw-driven profile, runs JobSpy, ranks results, writes a shortlist. |
+| `make scan-jobs SEARCH=<slug>` | `match-jobs` + auto-triage top-N + writes `jd_search/inbox.md`. |
+| `make inbox` | Cat `jd_search/inbox.md` (only `APPLY` / `BORDERLINE` candidates). |
+| `make draft JOB=<slug> FROM=inbox` | Import a candidate from `inbox.md` and draft (gate hits cache). |
+| `make import-search-result SEARCH=<slug> RANK=1 JOB=<job>` | Legacy: import one ranked search result by score rank. |
 
-Use `FORCE=1` only for intentional replacement.
+Use `FORCE=1` only for intentional replacement. `LINKEDIN_FETCH=0` disables
+LinkedIn description fetching (default on; required for non-empty `description`
+to flow into triage).
 
 ### 9. Job Lifecycle
 

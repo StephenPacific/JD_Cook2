@@ -463,14 +463,52 @@ def snapshot_ai_draft(job: str, force: bool) -> None:
     shutil.copy2(src, dst)
 
 
+def import_from_inbox(job: str, force: bool) -> None:
+    """Special-case auto-import: pull the staged JD body from
+    jd_search/inbox/<slug>.md (produced by `make scan-jobs`) into
+    jobs/<slug>.md. This skips import_job.py because we already have a
+    normalized JD body on disk.
+    """
+    staged = ROOT / "jd_search" / "inbox" / f"{job}.md"
+    if not staged.exists():
+        fail(
+            f"Slug `{job}` not found in jd_search/inbox/. "
+            "Run `make inbox` to list available candidates, "
+            "or `make scan-jobs SEARCH=<slug>` to populate the inbox."
+        )
+    target = ROOT / "jobs" / f"{job}.md"
+    if target.exists() and not force:
+        fail(
+            f"`{rel(target)}` already exists; refusing to re-import. "
+            "Pass FORCE=1 to overwrite."
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(staged.read_text(encoding="utf-8"), encoding="utf-8")
+    # Mirror import_job.py's source-snapshot convention so downstream tools
+    # (status, abort, learn) see a consistent shape.
+    snapshot_dir = ROOT / "jobs" / "_sources" / job
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    (snapshot_dir / "text.txt").write_text(staged.read_text(encoding="utf-8"), encoding="utf-8")
+    (snapshot_dir / "metadata.json").write_text(
+        '{"source_type": "jd_search-inbox", "staged_from": "'
+        + str(staged.relative_to(ROOT))
+        + '"}\n',
+        encoding="utf-8",
+    )
+    print(f"Auto-imported from inbox: {rel(target)} ← {rel(staged)}")
+
+
 def maybe_auto_import(job: str, args: argparse.Namespace) -> None:
     """If --from / --url is given and the JD has not been imported yet, run
-    scripts/import_job.py inline so the user can do the whole flow in one
-    command:  `make draft JOB=<slug> FROM=clipboard`.
+    scripts/import_job.py inline (or, for FROM=inbox, pull from the inbox
+    staging dir) so the user can do the whole flow in one command:
+
+        make draft JOB=<slug> FROM=clipboard
+        make draft JOB=<slug> FROM=inbox       (after `make scan-jobs`)
+        make draft JOB=<slug> URL=...
 
     `import_job.py --from` only accepts the literal value `clipboard` — file
-    paths are not supported there. If you want to draft from a file, run
-    `make import-job` separately or pipe the file content into the clipboard.
+    paths and "inbox" are handled here, not via import_job.py.
 
     If the JD already exists, refuse to silently overwrite unless --force.
     """
@@ -478,12 +516,16 @@ def maybe_auto_import(job: str, args: argparse.Namespace) -> None:
     if not has_source:
         return
 
+    if args.from_ and args.from_.lower() == "inbox":
+        import_from_inbox(job, args.force)
+        return
+
     if args.from_ and args.from_.lower() != "clipboard":
         fail(
             f"`make draft FROM={args.from_}` is not supported: "
-            "import_job.py only accepts FROM=clipboard. For a file, run "
-            f"`make import-job JOB={job} FROM=clipboard` after copying the file "
-            "content, or use URL=... for a public job page."
+            "valid values are 'clipboard' or 'inbox', or pass URL=... instead. "
+            "For a file, run `make import-job JOB={} FROM=clipboard` after "
+            "copying the file content.".format(job)
         )
 
     job_path = ROOT / "jobs" / f"{job}.md"
