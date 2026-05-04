@@ -269,6 +269,11 @@ def validate_resume_artifact(
                 f"Line {idx}: % src must not point to raw/.cache/ (it is a derived reading aid). "
                 "Cite the original source under raw/."
             )
+        if "jd_search/" in stripped:
+            errors.append(
+                f"Line {idx}: % src must not point to jd_search/ (it holds search/triage config "
+                "and personal preferences, not resume evidence). Cite the original source under raw/."
+            )
 
     if r"\mid" in text:
         errors.append(r"Found \mid in LaTeX body/template; use text-safe \textbar{} separators.")

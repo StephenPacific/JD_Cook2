@@ -42,6 +42,9 @@ preferences.md
 jd_search/profiles/*.json
 !jd_search/profiles/example.json
 jd_search/searches/
+jd_search/decisions.tsv
+jd_search/decisions.md
+jd_search/persona.md
 
 # Personal LaTeX template override — kept local only, has real PII baked in.
 # The public `latex-template.tex` uses placeholders; the skill prefers this

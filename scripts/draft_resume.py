@@ -12,6 +12,15 @@ from pathlib import Path
 
 from raw_cache import ensure_raw_cache
 
+# Import the triage judge so `make draft` can refuse JDs that triage flags as
+# SKIP or VISA-BLOCKED. Path manipulation keeps this script runnable from
+# anywhere without packaging.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "jd_search"))
+from triage import (  # noqa: E402
+    BLOCKING_VERDICTS,
+    judge_imported_job,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONTEXT_LIMIT = 2
@@ -409,6 +418,9 @@ def run_agent(agent: str, prompt: str) -> None:
         return
 
     if agent == "codex":
+        # `--full-auto` is deprecated in current Codex CLI; rely on
+        # `--sandbox workspace-write` for edit scope and `--ephemeral` to avoid
+        # nested Codex session writes under ~/.codex/sessions.
         command = [
             "codex",
             "exec",
@@ -416,11 +428,14 @@ def run_agent(agent: str, prompt: str) -> None:
             str(ROOT),
             "--sandbox",
             "workspace-write",
-            "--full-auto",
+            "--ephemeral",
             "-",
         ]
         result = subprocess.run(command, cwd=ROOT, input=prompt, text=True)
     elif agent == "claude":
+        # Claude CLI rejects a positional prompt when other flags follow `-p`;
+        # it requires the prompt via stdin or --prompt. Pipe via stdin so the
+        # full prompt (including newlines) survives without shell quoting.
         command = [
             "claude",
             "-p",
@@ -428,9 +443,8 @@ def run_agent(agent: str, prompt: str) -> None:
             "acceptEdits",
             "--allowedTools",
             "Read,Write,Edit,Glob,Grep",
-            prompt,
         ]
-        result = subprocess.run(command, cwd=ROOT, text=True)
+        result = subprocess.run(command, cwd=ROOT, input=prompt, text=True)
     else:
         fail(f"Unknown draft agent: {agent}. Use AGENT=auto, codex, claude, or print.")
 
@@ -449,14 +463,65 @@ def snapshot_ai_draft(job: str, force: bool) -> None:
     shutil.copy2(src, dst)
 
 
+def maybe_auto_import(job: str, args: argparse.Namespace) -> None:
+    """If --from / --url is given and the JD has not been imported yet, run
+    scripts/import_job.py inline so the user can do the whole flow in one
+    command:  `make draft JOB=<slug> FROM=clipboard`.
+
+    `import_job.py --from` only accepts the literal value `clipboard` — file
+    paths are not supported there. If you want to draft from a file, run
+    `make import-job` separately or pipe the file content into the clipboard.
+
+    If the JD already exists, refuse to silently overwrite unless --force.
+    """
+    has_source = bool(args.from_ or args.url)
+    if not has_source:
+        return
+
+    if args.from_ and args.from_.lower() != "clipboard":
+        fail(
+            f"`make draft FROM={args.from_}` is not supported: "
+            "import_job.py only accepts FROM=clipboard. For a file, run "
+            f"`make import-job JOB={job} FROM=clipboard` after copying the file "
+            "content, or use URL=... for a public job page."
+        )
+
+    job_path = ROOT / "jobs" / f"{job}.md"
+    if job_path.exists() and not args.force:
+        fail(
+            f"`{rel(job_path)}` already exists; refusing to re-import. "
+            "Pass FORCE=1 to overwrite, or drop FROM=/URL= to use the existing import."
+        )
+
+    print(f"Auto-importing JD before drafting: JOB={job}")
+    import_cmd = [sys.executable, str(ROOT / "scripts" / "import_job.py"), "--job", job]
+    if args.from_:
+        import_cmd.extend(["--from", args.from_])
+    if args.url:
+        import_cmd.extend(["--url", args.url])
+    if args.mode:
+        import_cmd.extend(["--mode", args.mode])
+    if args.force:
+        import_cmd.append("--force")
+    result = subprocess.run(import_cmd, cwd=ROOT)
+    if result.returncode != 0:
+        fail(f"Auto-import failed with exit code {result.returncode}.")
+
+
 def draft(args: argparse.Namespace) -> None:
     job = args.job
     if not job:
         fail("`draft` requires --job.")
 
+    maybe_auto_import(job, args)
+
     job_path = ROOT / "jobs" / f"{job}.md"
     if not job_path.exists():
-        fail(f"Missing imported JD: {rel(job_path)}. Run `make import-job JOB={job} ...` first.")
+        fail(
+            f"Missing imported JD: {rel(job_path)}. "
+            "Either pass FROM=clipboard / FROM=<file> / URL=... to auto-import, "
+            f"or run `make import-job JOB={job} ...` first."
+        )
     if not raw_has_evidence():
         fail("No raw evidence found under `raw/`. Add confirmed source material before drafting.")
     if draft_path(job).exists() and not args.force:
@@ -470,6 +535,40 @@ def draft(args: argparse.Namespace) -> None:
 
     agent = choose_agent(args.agent)
     ensure_raw_cache(quiet=False)
+
+    # Pre-draft triage gate: refuse to draft for JDs the judge marks SKIP or
+    # VISA-BLOCKED. Cached after the first run, so the second `make draft` of
+    # the same JD does not re-judge. Bypass with FORCE=1.
+    if agent != "print":
+        triage_agent = "codex" if agent == "codex" else "claude"
+        try:
+            decision, cached, triage_title, _ = judge_imported_job(
+                job, triage_agent
+            )
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            print(f"WARNING: triage check failed ({exc}); proceeding without gate.", file=sys.stderr)
+            decision = None
+        if decision is not None:
+            verdict = decision.get("verdict", "")
+            confidence = decision.get("confidence", "")
+            visa = decision.get("visa_status", "")
+            cache_tag = " [cached]" if cached else ""
+            print(f"Triage{cache_tag}: {verdict} ({confidence}) — visa: {visa}")
+            if verdict in BLOCKING_VERDICTS and not args.force:
+                concerns = decision.get("concerns") or []
+                print("Refusing to draft because triage blocked this JD:", file=sys.stderr)
+                for item in concerns[:3]:
+                    print(f"  - {item}", file=sys.stderr)
+                reasoning = decision.get("reasoning", "").strip()
+                if reasoning:
+                    print(f"  Reasoning: {reasoning}", file=sys.stderr)
+                print("Override with FORCE=1 if you have new context.", file=sys.stderr)
+                raise SystemExit(2)
+            if verdict in BLOCKING_VERDICTS and args.force:
+                print("Triage block overridden by FORCE=1.")
+
     job_text = job_path.read_text(encoding="utf-8")
     draft_context, selected_examples = write_context_file(
         job,
@@ -512,6 +611,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--context-limit", type=int, default=DEFAULT_CONTEXT_LIMIT)
     parser.add_argument("--context-threshold", type=float, default=DEFAULT_CONTEXT_THRESHOLD)
     parser.add_argument("--force", action="store_true")
+    # Optional auto-import: passing --from / --url runs import_job.py first
+    # so the user can do  `make draft JOB=<slug> FROM=clipboard`  in one shot.
+    parser.add_argument(
+        "--from",
+        dest="from_",
+        help="Auto-import shorthand: 'clipboard' or a file path. Mirrors `make import-job FROM=...`.",
+    )
+    parser.add_argument("--url", help="Auto-import from a public URL before drafting.")
+    parser.add_argument("--mode", choices=("auto", "http", "js"), help="URL fetch mode passed through to import_job.")
     return parser
 
 

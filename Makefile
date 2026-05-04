@@ -18,6 +18,9 @@ HOURS_OLD ?= 168
 MAX_QUERIES ?= 8
 RANK ?= 1
 DRY_RUN ?=
+TRIAGE_AGENT ?= codex
+SECOND_TRIAGE_AGENT ?=
+PERSONA ?= jd_search/persona.md
 
 ifeq ($(SCOPE),approved)
 SRC := approved/$(JOB)/$(JOB).tex
@@ -25,11 +28,16 @@ else
 SRC := drafts/$(JOB).tex
 endif
 
+TRIAGE_JOB_ARG :=
+ifneq ($(filter command line environment,$(origin JOB)),)
+TRIAGE_JOB_ARG := --job "$(JOB)"
+endif
+
 LATEX_OUT := $(OUT_ROOT)/latex/$(SCOPE)/$(JOB)
 PDF_OUT := $(OUT_ROOT)/pdf/$(SCOPE)
 PDF := $(PDF_OUT)/$(JOB).pdf
 
-.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result check approve export learn clean-draft abort status check-all raw-cache
+.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result triage check approve export learn clean-draft abort status check-all raw-cache
 
 pdf:
 	@test -f "$(SRC)" || (echo "Missing source: $(SRC)" >&2; exit 1)
@@ -39,7 +47,7 @@ pdf:
 	@echo "PDF ready: $(PDF)"
 
 draft:
-	$(PYTHON) scripts/draft_resume.py --job "$(JOB)" --agent "$(AGENT)" --context-limit "$(CONTEXT_LIMIT)" --context-threshold "$(CONTEXT_THRESHOLD)" $(if $(FORCE),--force)
+	$(PYTHON) scripts/draft_resume.py --job "$(JOB)" --agent "$(AGENT)" --context-limit "$(CONTEXT_LIMIT)" --context-threshold "$(CONTEXT_THRESHOLD)" $(if $(FROM),--from "$(FROM)") $(if $(URL),--url "$(URL)") $(if $(MODE),--mode "$(MODE)") $(if $(FORCE),--force)
 
 draft-pdf:
 	$(MAKE) pdf SCOPE=drafts JOB="$(JOB)"
@@ -65,6 +73,9 @@ search-jobs:
 
 import-search-result:
 	$(PYTHON) jd_search/import_result.py --search "$(SEARCH)" --rank "$(RANK)" --job "$(JOB)" $(if $(FORCE),--force)
+
+triage:
+	$(PYTHON) jd_search/triage.py --agent "$(TRIAGE_AGENT)" --persona "$(PERSONA)" $(if $(SECOND_TRIAGE_AGENT),--second-agent "$(SECOND_TRIAGE_AGENT)") $(if $(URL),--url "$(URL)") $(if $(FILE),--file "$(FILE)") $(if $(FROM),--from "$(FROM)") $(TRIAGE_JOB_ARG) $(if $(FORCE),--refresh) $(if $(NO_CACHE),--no-cache)
 
 check: draft-pdf
 	$(PYTHON) scripts/cycle.py check --job "$(JOB)"
