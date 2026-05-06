@@ -258,17 +258,35 @@ def read_input(args: argparse.Namespace) -> tuple[str, str, str]:
     return sys.stdin.read(), "stdin", "stdin"
 
 
+def extract_jd_body(text: str) -> str:
+    """Strip the import-time header (everything before the first `---` line)
+    so the cache key sees only the JD content. Both scan_to_inbox.build_jd_body
+    and scripts/import_job.build_job_markdown emit `<header>\\n---\\n\\n<body>`,
+    so splitting on the separator yields identical content across the two
+    paths even though their headers (Imported at, Source URL, ...) differ.
+    Falls back to the full text when no separator is found (raw clipboard
+    paste, ad-hoc files)."""
+    parts = text.split("\n---\n", 1)
+    return parts[1] if len(parts) == 2 else text
+
+
 def cache_key(source_type: str, source: str, jd_text: str) -> str:
-    if source_type == "url":
-        material = f"url:{source.strip().lower()}"
-    elif source_type in {"file", "job"}:
-        material = f"{source_type}:{source}:{hashlib.sha256(jd_text.encode()).hexdigest()}"
-    else:
-        # stdin / clipboard / inline / anything else: dedup by content alone so
-        # the same pasted JD reuses an earlier verdict regardless of how it
-        # arrived (pbpaste pipe vs `FROM=clipboard` vs paste-into-file).
-        material = f"paste:{hashlib.sha256(jd_text.encode()).hexdigest()}"
-    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+    """Content-only cache key.
+
+    Earlier versions branched on source_type (url / job / paste) and folded
+    the file path or URL into the key, which silently busted the cache
+    whenever the same JD entered the pipeline through two doors — e.g.
+    scan_to_inbox stored a verdict under `url:<linkedin>` and the later
+    `make draft FROM=inbox` triage gate looked it up under
+    `job:jobs/<slug>.md:<sha256(text)>`, so every drafted JD got re-judged.
+
+    The key is now the sha256 of the normalized JD body alone. The
+    source_type / source arguments are still accepted for backward
+    compatibility with existing callers but no longer affect the key.
+    """
+    body = extract_jd_body(jd_text)
+    normalized = re.sub(r"\s+", " ", body).strip().lower()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
 
 
 def visa_precheck(jd_text: str) -> dict[str, Any]:

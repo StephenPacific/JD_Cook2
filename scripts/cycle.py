@@ -113,6 +113,18 @@ def metadata_path(job_dir: Path) -> Path:
     return job_dir / "metadata.md"
 
 
+def inbox_staged_path(job: str) -> Path:
+    return ROOT / "jd_search" / "inbox" / f"{job}.md"
+
+
+def seen_tsv_path() -> Path:
+    return ROOT / "jd_search" / "seen.tsv"
+
+
+def applied_log_path() -> Path:
+    return ROOT / "approved" / "_applied.tsv"
+
+
 def metadata_fields(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
@@ -229,8 +241,8 @@ def validate_resume_artifact(
             r"No detectable resume bullets found. "
             r"Use the required shape \resumeItem{\normalsize{...}} followed by % src:."
         )
-    if len(bullet_lines) > 10:
-        errors.append(f"Bullet budget exceeded: {len(bullet_lines)} resume bullets found, max is 10.")
+    if len(bullet_lines) > 12:
+        errors.append(f"Bullet budget exceeded: {len(bullet_lines)} resume bullets found, max is 12.")
 
     for line_no, _line in bullet_lines:
         next_line = lines[line_no].strip() if line_no < len(lines) else ""
@@ -303,7 +315,7 @@ def validate_resume_artifact(
         raise SystemExit(1)
 
     print(f"Check passed: {job} ({artifact_label})")
-    print(f"- bullets: {len(bullet_lines)}/10")
+    print(f"- bullets: {len(bullet_lines)}/12")
     print(f"- TODO gaps: {todo_count}")
     print(f"- PDF pages: {pages}")
     for item in warnings:
@@ -966,6 +978,126 @@ def yes_no(value: bool) -> str:
     return "yes" if value else "no"
 
 
+def parse_job_frontmatter(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    fields: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("---"):
+            break
+        match = re.match(r"^- ([^:]+):\s*(.*)$", line)
+        if match:
+            fields[match.group(1).strip()] = match.group(2).strip()
+    return fields
+
+
+def update_metadata_applied_at(path: Path, applied_at_value: str) -> None:
+    if not path.exists():
+        fail(f"Metadata file missing: {rel(path)}")
+    text = path.read_text(encoding="utf-8")
+    new_line = f"- **Applied at:** {applied_at_value}"
+    pattern = re.compile(r"^- \*\*Applied at:\*\*.*$", re.MULTILINE)
+    if pattern.search(text):
+        text = pattern.sub(new_line, text)
+    else:
+        submission_pattern = re.compile(
+            r"(^- \*\*Submission date:\*\*.*$)", re.MULTILINE
+        )
+        if submission_pattern.search(text):
+            text = submission_pattern.sub(r"\1\n" + new_line, text, count=1)
+        else:
+            if not text.endswith("\n"):
+                text += "\n"
+            text += new_line + "\n"
+    path.write_text(text, encoding="utf-8")
+
+
+def applied(args: argparse.Namespace) -> None:
+    job = require_job(args)
+
+    sample_dirs = sample_dirs_for_job(job)
+    if not sample_dirs:
+        fail(
+            f"`{job}` has no approved artifact. "
+            f"Run `make approve JOB={job}` before marking applied."
+        )
+    approved_d = sample_dirs[0]
+    metadata = metadata_path(approved_d)
+    fields = metadata_fields(metadata)
+
+    already = fields.get("Applied at")
+    if already and not force_enabled(args):
+        fail(
+            f"`{job}` is already marked applied at {already}. "
+            "Pass FORCE=1 to overwrite the timestamp."
+        )
+
+    applied_at_iso = (
+        dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    )
+
+    inbox_file = inbox_staged_path(job)
+    inbox_removed = inbox_file.exists()
+    if inbox_removed:
+        inbox_file.unlink()
+
+    seen_path = seen_tsv_path()
+    seen_updated = False
+    if seen_path.exists():
+        lines = seen_path.read_text(encoding="utf-8").splitlines()
+        if lines:
+            header = lines[0].split("\t")
+            try:
+                slug_idx = header.index("slug")
+                verdict_idx = header.index("last_verdict")
+            except ValueError:
+                slug_idx = verdict_idx = -1
+            if slug_idx >= 0 and verdict_idx >= 0:
+                new_lines = [lines[0]]
+                for line in lines[1:]:
+                    parts = line.split("\t")
+                    if len(parts) > max(slug_idx, verdict_idx) and parts[slug_idx] == job:
+                        parts[verdict_idx] = "APPLIED"
+                        seen_updated = True
+                    new_lines.append("\t".join(parts))
+                if seen_updated:
+                    seen_path.write_text(
+                        "\n".join(new_lines) + "\n", encoding="utf-8"
+                    )
+
+    update_metadata_applied_at(metadata, applied_at_iso)
+
+    job_meta = parse_job_frontmatter(job_markdown(job))
+    log_path = applied_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    is_new = not log_path.exists()
+    log_columns = ["slug", "applied_at", "company", "title", "source_url"]
+    log_row = "\t".join(
+        [
+            job,
+            applied_at_iso,
+            job_meta.get("Company", ""),
+            job_meta.get("Title", ""),
+            job_meta.get("Source URL", ""),
+        ]
+    )
+    with log_path.open("a", encoding="utf-8") as f:
+        if is_new:
+            f.write("\t".join(log_columns) + "\n")
+        f.write(log_row + "\n")
+
+    print(f"Marked applied: {job}")
+    print(f"- applied_at: {applied_at_iso}")
+    print(f"- inbox staging removed: {yes_no(inbox_removed)}")
+    print(f"- seen.tsv verdict updated: {yes_no(seen_updated)}")
+    print(f"- metadata updated: {rel(metadata)}")
+    print(f"- applied log: {rel(log_path)}")
+    print()
+    print(
+        "Next: `make scan-jobs SEARCH=...` will regenerate inbox.md without this slug."
+    )
+
+
 def status(args: argparse.Namespace) -> None:
     job = require_job(args)
     job_edits_dir = edits_dir(job)
@@ -980,6 +1112,7 @@ def status(args: argparse.Namespace) -> None:
         "snapshotted": (job_edits_dir / "ai-draft.tex").exists(),
         "approved": approved_sample is not None,
         "learned": (job_edits_dir / "note.md").exists(),
+        "applied": bool(fields.get("Applied at")),
     }
 
     issues: list[str] = []
@@ -1010,7 +1143,7 @@ def status(args: argparse.Namespace) -> None:
 
     print(f"Status: {job}")
     print("- lifecycle:")
-    for name in ("imported", "drafted", "snapshotted", "approved", "learned"):
+    for name in ("imported", "drafted", "snapshotted", "approved", "learned", "applied"):
         print(f"  - {name}: {yes_no(lifecycle[name])}")
     if lifecycle["drafted"]:
         print("  - checked: not persisted; run `make check JOB={}` to evaluate the active draft now".format(job))
@@ -1077,7 +1210,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="JDcook cycle helper")
     parser.add_argument(
         "command",
-        choices=("check", "approve", "export", "learn", "clean-draft", "abort", "status", "check-all"),
+        choices=("check", "approve", "export", "learn", "clean-draft", "abort", "status", "check-all", "applied"),
     )
     parser.add_argument("--job")
     parser.add_argument("--force", action="store_true")
@@ -1090,6 +1223,7 @@ def main() -> None:
         check(args)
     elif args.command == "approve":
         approve(args)
+        applied(args)
     elif args.command == "export":
         export_public(args)
     elif args.command == "learn":
@@ -1102,6 +1236,8 @@ def main() -> None:
         status(args)
     elif args.command == "check-all":
         check_all(args)
+    elif args.command == "applied":
+        applied(args)
 
 
 if __name__ == "__main__":

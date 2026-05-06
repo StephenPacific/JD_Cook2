@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import hashlib
 import json
 import re
 import sys
@@ -11,12 +12,15 @@ from pathlib import Path
 from typing import Any
 
 from raw_profile import build_profile_from_raw
+from adzuna import fetch_adzuna_jobs, has_credentials as adzuna_has_credentials
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SEARCH_ROOT = ROOT / "jd_search" / "searches"
 DEFAULT_GENERATED_PROFILE = ROOT / "jd_search" / "profiles" / "generated-from-raw.json"
-DEFAULT_SITES = ["indeed", "linkedin", "glassdoor", "google"]
+JOBSPY_SITES = {"indeed", "linkedin", "glassdoor", "google", "zip_recruiter", "bayt", "naukri", "bdjobs"}
+ADZUNA_SITE = "adzuna"
+DEFAULT_SITES = ["indeed", "linkedin", "glassdoor", "google", ADZUNA_SITE]
 STOPWORDS = {
     "and",
     "are",
@@ -247,20 +251,46 @@ def score_record(record: dict[str, Any], profile: dict[str, Any]) -> dict[str, A
     }
 
 
+def content_hash(text: str) -> str:
+    """Normalized JD-body fingerprint for cross-URL dedup.
+
+    Returns "" when the description is too short to dedup safely (we don't
+    want every empty/teaser record collapsing into one).
+    """
+    if not text or len(text) < 100:
+        return ""
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
 def dedupe(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
+    """Three-layer dedup: URL, then site+title+company+location, then
+    content-hash of the JD body. The third layer catches same-JD different-
+    URL cases (aggregator re-listings, recruiter mirror posts) that the
+    first two miss."""
+    seen_url: set[str] = set()
+    seen_meta: set[str] = set()
+    seen_content: set[str] = set()
     out: list[dict[str, Any]] = []
     for record in records:
-        key = (
-            str(record.get("job_url") or record.get("job_url_direct") or "").lower()
-            or "|".join(
-                str(record.get(field, "")).lower().strip()
-                for field in ("site", "title", "company", "location")
-            )
+        url = str(record.get("job_url") or record.get("job_url_direct") or "").lower()
+        meta = "|".join(
+            str(record.get(field, "")).lower().strip()
+            for field in ("site", "title", "company", "location")
         )
-        if key in seen:
+        ch = content_hash(str(record.get("description", "")))
+        if url and url in seen_url:
             continue
-        seen.add(key)
+        if not url and meta in seen_meta:
+            continue
+        if ch and ch in seen_content:
+            continue
+        if url:
+            seen_url.add(url)
+        else:
+            seen_meta.add(meta)
+        if ch:
+            seen_content.add(ch)
         out.append(record)
     return out
 
@@ -271,7 +301,14 @@ def dataframe_to_records(df: Any) -> list[dict[str, Any]]:
     fail("JobSpy returned an unsupported result type.")
 
 
-def run_jobspy(plan: list[dict[str, str]], args: argparse.Namespace, profile: dict[str, Any]) -> list[dict[str, Any]]:
+def run_jobspy(
+    plan: list[dict[str, str]],
+    sites: list[str],
+    args: argparse.Namespace,
+    profile: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if not sites:
+        return []
     try:
         from jobspy import scrape_jobs
     except ImportError:
@@ -283,7 +320,7 @@ def run_jobspy(plan: list[dict[str, str]], args: argparse.Namespace, profile: di
     records: list[dict[str, Any]] = []
     for item in plan:
         df = scrape_jobs(
-            site_name=args.sites,
+            site_name=sites,
             search_term=item["search_term"],
             google_search_term=item["google_search_term"],
             location=item["location"] or None,
@@ -300,6 +337,23 @@ def run_jobspy(plan: list[dict[str, str]], args: argparse.Namespace, profile: di
             record["_google_search_term"] = item["google_search_term"]
             records.append(flatten_record(record))
     return records
+
+
+def run_adzuna(
+    plan: list[dict[str, str]],
+    args: argparse.Namespace,
+    profile: dict[str, Any],
+) -> list[dict[str, Any]]:
+    country_indeed = (args.country_indeed or profile.get("country_indeed") or "Australia").lower()
+    country_code = "au" if country_indeed.startswith("au") else "gb"
+    raw_records = fetch_adzuna_jobs(
+        plan=plan,
+        results_wanted=args.results_wanted,
+        hours_old=args.hours_old,
+        country=country_code,
+        verbose=args.verbose,
+    )
+    return [flatten_record(record) for record in raw_records]
 
 
 def write_csv(path: Path, records: list[dict[str, Any]], force: bool) -> None:
@@ -371,6 +425,13 @@ def main() -> None:
     if args.results_wanted < 1:
         fail("--results-wanted must be at least 1.")
 
+    requested = [s.lower() for s in args.sites]
+    unknown = [s for s in requested if s not in JOBSPY_SITES and s != ADZUNA_SITE]
+    if unknown:
+        fail(f"Unknown site(s) in --sites: {', '.join(unknown)}.")
+    jobspy_sites = [s for s in requested if s in JOBSPY_SITES]
+    use_adzuna = ADZUNA_SITE in requested
+
     explicit_locations = args.location
     if args.profile_from_raw or not args.profile:
         profile_path = resolve_path(args.profile_out)
@@ -395,6 +456,9 @@ def main() -> None:
         "search": args.search,
         "profile": rel(profile_path) if profile_path.is_relative_to(ROOT) else str(profile_path),
         "sites": args.sites,
+        "jobspy_sites": jobspy_sites,
+        "adzuna_enabled": use_adzuna,
+        "adzuna_credentialed": adzuna_has_credentials() if use_adzuna else False,
         "results_wanted_per_site_per_query": args.results_wanted,
         "hours_old": args.hours_old,
         "country_indeed": args.country_indeed or profile.get("country_indeed", "Australia"),
@@ -407,7 +471,9 @@ def main() -> None:
         print(f"Query plan ready: {rel(search_dir / 'query_plan.json')}")
         return
 
-    raw_records = run_jobspy(plan, args, profile)
+    raw_records = run_jobspy(plan, jobspy_sites, args, profile)
+    if use_adzuna:
+        raw_records.extend(run_adzuna(plan, args, profile))
     raw_records = dedupe(raw_records)
     write_csv(search_dir / "raw_results.csv", raw_records, args.force)
 

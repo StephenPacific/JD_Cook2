@@ -201,6 +201,14 @@ Edit `drafts/my-first-jd.tex` in your editor, then validate:
 make check JOB=my-first-jd
 ```
 
+> **⚠️ Editing rule — preserve `% src:` and `% TODO:` lines.**
+> Each `\resumeItem{...}` is followed by a `% src: raw/...` audit line, and
+> the file head holds 1–4 `% TODO:` evidence-gap comments. `make check`
+> will fail (zero `% src:` after a bullet, missing TODO block) if these
+> are deleted. They are stripped automatically from the public `.public.tex`
+> at approve time, so reviewers never see them — they only exist for
+> internal audit and the learn step.
+
 Fix failures and rerun `make check` until it passes. When ready:
 
 ```bash
@@ -215,6 +223,18 @@ approved/my-first-jd/my-first-jd.public.tex
 approved/my-first-jd/my-first-jd.pdf
 approved/my-first-jd/metadata.md
 ```
+
+`make approve` also automatically runs the **applied** step at the end:
+it deletes `jd_search/inbox/<slug>.md`, marks the `seen.tsv` row as
+`APPLIED` (so the inbox regenerator hides it next scan), stamps an
+`Applied at:` timestamp into `metadata.md`, and appends a row to
+`approved/_applied.tsv` (a cross-slug submission log).
+
+The semantic of approve is therefore: **"this version is final and is
+the one I am submitting"**. If you only want to freeze a version without
+counting it as submitted, use `make export` instead. To re-approve after
+a polish pass, use `FORCE=1` — but note this also bumps the applied
+timestamp and adds a duplicate row to `_applied.tsv`.
 
 Run learning when you made meaningful edits, or when you want to record that the
 AI draft was accepted as-is:
@@ -291,7 +311,8 @@ cache:         raw/.cache/ + build/ + jd_search/searches/
 | `make preview JOB=<slug>` / `make draft-pdf JOB=<slug>` | Compiles active draft to `build/pdf/drafts/<slug>.pdf`. |
 | `make approved JOB=<slug>` | Compiles `approved/<slug>/<slug>.tex` to `build/pdf/approved/<slug>.pdf`. |
 | `make check JOB=<slug>` | Compiles and validates the active draft. |
-| `make approve JOB=<slug>` | Runs `check`, copies the internal `.tex` and PDF to `approved/<slug>/`, exports `.public.tex`, writes metadata, and removes the active draft. |
+| `make approve JOB=<slug>` | Runs `check`, copies the internal `.tex` and PDF to `approved/<slug>/`, exports `.public.tex`, writes metadata, removes the active draft, **and auto-runs `applied` (deletes inbox staging, marks `seen.tsv` APPLIED, stamps `Applied at:` in metadata, appends to `approved/_applied.tsv`)**. Pass `FORCE=1` to re-approve. |
+| `make applied JOB=<slug>` | Standalone "mark as submitted" step. Normally not needed — `make approve` already chains it. Use only as an escape hatch (back-fill old approved slugs, or stamp a delayed-submission timestamp). |
 | `make export JOB=<slug>` | Regenerates the share-safe `.public.tex` from the internal approved `.tex`. |
 | `make learn JOB=<slug>` | Compares `ai-draft.tex` with approved `.tex`, writes learning materials, and optionally promotes personal rules. |
 | `make clean-draft JOB=<slug>` | Safely removes `drafts/<slug>.tex` after an approved artifact exists. |
@@ -301,6 +322,7 @@ cache:         raw/.cache/ + build/ + jd_search/searches/
 | `make triage FROM=clipboard` | Triage one JD via the LLM judge. Accepts `URL=`, `FILE=`, `JOB=`, or pipe via stdin. |
 | `make match-jobs SEARCH=<slug>` | Builds a raw-driven profile, runs JobSpy, ranks results, writes a shortlist. |
 | `make scan-jobs SEARCH=<slug>` | `match-jobs` + auto-triage top-N + writes `jd_search/inbox.md`. |
+| `make triage-inbox SEARCH=<slug>` | Resume the triage half only — re-runs the LLM judge over an existing `searches/<slug>/ranked_jobs.json` and regenerates `inbox.md`. Use after a `scan-jobs` run where the JobSpy/Adzuna scrape succeeded but the triage stage failed (e.g. wrong `TRIAGE_AGENT`, transient LLM hang). Saves you from re-scraping. |
 | `make inbox` | Cat `jd_search/inbox.md` (only `APPLY` / `BORDERLINE` candidates). |
 | `make draft JOB=<slug> FROM=inbox` | Import a candidate from `inbox.md` and draft (gate hits cache). |
 | `make import-search-result SEARCH=<slug> RANK=1 JOB=<job>` | Legacy: import one ranked search result by score rank. |

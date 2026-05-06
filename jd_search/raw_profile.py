@@ -9,7 +9,14 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LOCATIONS = ["Sydney NSW", "Remote Australia"]
+DEFAULT_LOCATIONS = [
+    "Sydney NSW",
+    "Melbourne VIC",
+    "Brisbane QLD",
+    "Perth WA",
+    "Adelaide SA",
+    "Remote Australia",
+]
 DEFAULT_COUNTRY = "Australia"
 # Roles always added to target_roles, regardless of raw-evidence match.
 # Use this for "broaden" roles the user wants to scan for even though raw
@@ -19,7 +26,16 @@ DEFAULT_BROADEN_ROLES = [
     "Technical Product Manager",
     "Solutions Engineer",
     "Quant Developer",
+    "Forward-Deployed Engineer",
+    "Backend Engineer",
+    "Data Engineer",
 ]
+# Note: deliberately NOT broadening JobSpy/Adzuna into pure-infra IT roles
+# (DevOps / Platform / Cloud / SRE / IT Support). Burning aggregator quota
+# on adjacent roles is wasteful — Adzuna free tier is ~250 calls/day and
+# 14+ roles × 5 cities × multi-page can blow it. For breadth into general
+# IT, use `make web-search QUERY="..."` (Lv2) which targets Claude's
+# WebSearch tool one query at a time.
 DEFAULT_AVOID_KEYWORDS = [
     # ─── Hard rules only. Subjective "is this role a fit" judgements live
     # in the LLM triage layer, not here. Regex only kills JDs the user
@@ -42,7 +58,9 @@ DEFAULT_AVOID_KEYWORDS = [
     # provably cannot meet) ───
     "5+ years",
     "5 or more years",
+    "6+ years",
     "7+ years",
+    "8+ years",
     "10+ years",
 
     # ─── Visa hard kills (deterministic, not LLM-judgable, not

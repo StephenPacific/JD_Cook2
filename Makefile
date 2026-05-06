@@ -12,12 +12,17 @@ PROFILE_OUT ?= jd_search/profiles/generated-from-raw.json
 RAW_ROOT ?= raw
 QUERY ?=
 LOCATION ?=
-SITES ?= indeed,linkedin,google
+SITES ?= indeed,linkedin,google,adzuna
 # Glassdoor dropped: their unauthenticated location lookup endpoint
 # (`findPopularLocationAjax.htm`) returns 403 to all queries since ~2024,
 # so JobSpy can't resolve any location ID and every Glassdoor call fails
 # with "location not parsed". Re-add it manually if/when JobSpy ships an
 # updated Glassdoor adapter.
+#
+# `adzuna` is implemented locally in jd_search/adzuna.py (JobSpy has no SEEK
+# or Adzuna scraper). Set ADZUNA_APP_ID and ADZUNA_APP_KEY in your env
+# (free tier: https://developer.adzuna.com/) — without them the adapter
+# logs and skips itself silently, so the search still runs on JobSpy alone.
 RESULTS_WANTED ?= 10
 HOURS_OLD ?= 168
 MAX_QUERIES ?= 8
@@ -44,7 +49,7 @@ LATEX_OUT := $(OUT_ROOT)/latex/$(SCOPE)/$(JOB)
 PDF_OUT := $(OUT_ROOT)/pdf/$(SCOPE)
 PDF := $(PDF_OUT)/$(JOB).pdf
 
-.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result triage scan-jobs inbox check approve export learn clean-draft abort status check-all raw-cache
+.PHONY: pdf draft draft-pdf preview approved approved-pdf import-job plan-jobs match-jobs search-jobs import-search-result triage scan-jobs triage-inbox inbox check approve export learn clean-draft abort status check-all raw-cache applied web-search
 
 pdf:
 	@test -f "$(SRC)" || (echo "Missing source: $(SRC)" >&2; exit 1)
@@ -86,6 +91,10 @@ triage:
 
 scan-jobs:
 	$(MAKE) match-jobs SEARCH="$(SEARCH)" $(if $(QUERY),QUERY="$(QUERY)") $(if $(LOCATION),LOCATION="$(LOCATION)") $(if $(SITES),SITES="$(SITES)") $(if $(RESULTS_WANTED),RESULTS_WANTED="$(RESULTS_WANTED)") $(if $(HOURS_OLD),HOURS_OLD="$(HOURS_OLD)") $(if $(FORCE),FORCE=1)
+	$(MAKE) triage-inbox SEARCH="$(SEARCH)" $(if $(TOP_N),TOP_N="$(TOP_N)") $(if $(TRIAGE_AGENT),TRIAGE_AGENT="$(TRIAGE_AGENT)") $(if $(REJUDGE),REJUDGE=1)
+
+triage-inbox:
+	@test -f "jd_search/searches/$(SEARCH)/ranked_jobs.json" || (echo "No ranked_jobs.json for SEARCH=$(SEARCH); run \`make match-jobs SEARCH=$(SEARCH)\` first." >&2; exit 1)
 	$(PYTHON) scripts/scan_to_inbox.py --search "$(SEARCH)" --top-n "$(TOP_N)" --agent "$(TRIAGE_AGENT)" --persona "$(PERSONA)" $(if $(REJUDGE),--rejudge)
 
 inbox:
@@ -102,6 +111,13 @@ export:
 
 learn:
 	$(PYTHON) scripts/cycle.py learn --job "$(JOB)"
+
+applied:
+	$(PYTHON) scripts/cycle.py applied --job "$(JOB)" $(if $(FORCE),--force)
+
+web-search:
+	@test -n "$(QUERY)" || (echo "Usage: make web-search QUERY=\"<free-form search intent>\"" >&2; exit 1)
+	$(PYTHON) scripts/web_search.py --query "$(QUERY)"
 
 clean-draft:
 	$(PYTHON) scripts/cycle.py clean-draft --job "$(JOB)"

@@ -208,11 +208,40 @@ make import-search-result SEARCH=ai-engineer-sydney RANK=1 JOB=my-target-role
 make draft JOB=my-target-role
 ```
 
+## Adzuna AU adapter
+
+JobSpy has no SEEK or Adzuna scraper. To cover Australian listings beyond
+LinkedIn / Indeed (Adzuna aggregates many AU boards including content
+re-listed from SEEK partners), this repo ships a local adapter at
+`jd_search/adzuna.py`.
+
+Setup:
+
+```sh
+# Register a free account at https://developer.adzuna.com/ to get keys.
+export ADZUNA_APP_ID=...
+export ADZUNA_APP_KEY=...
+```
+
+Adzuna is on the default `SITES` list (`indeed,linkedin,google,adzuna`).
+If the env vars are unset the adapter logs a warning to stderr and skips
+itself — the rest of the search still runs on JobSpy.
+
+Caveats:
+
+- The Adzuna search API returns truncated descriptions (~500 chars). They
+  are usually long enough to clear the `scan_to_inbox.py` 80-char floor and
+  to feed the LLM judge, but full JD bodies still live on the original
+  posting site.
+- `job_url` is Adzuna's redirect link; clicking through lands on the
+  original employer / SEEK / LinkedIn page.
+
 ## Safety Notes
 
 This layer does not log in, click Apply, solve CAPTCHA, or bypass access
 controls. JobSpy issues HTTP requests to public job-board endpoints and can be
-rate limited. `make triage URL=...` fetches public job pages only.
+rate limited. The Adzuna adapter calls the official Adzuna Search API with the
+user's own API key. `make triage URL=...` fetches public job pages only.
 
 The raw-driven search command does not send raw resume/project text to JobSpy;
 raw content is used locally to infer broad target roles and score results. LLM
