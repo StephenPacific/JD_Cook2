@@ -46,7 +46,7 @@ All sections: `\section{\color{nameblue}\Large SECTIONNAME}` (all caps)
 
 - Most recent role: up to 5 bullets
 - Older roles: 2–3 bullets
-- Each bullet: 10–22 words (see `bullet-rules.md`)
+- Each bullet: target 12–18 words (see `bullet-rules.md`); rewrite or split above 25. **Length is drafting guidance, not a hard validator gate** — the only hard validator gate is one-page PDF fit.
 
 ## Entry — PROJECTS
 
@@ -101,7 +101,8 @@ Template default is 2 categories (Languages, Technologies & Tools). A 3rd catego
 
 **URLs:** define at top as `\newcommand{\XxxURL}{https://...}`, reference inside project titles via `\href{\XxxURL}{\small [GitHub]}`. Keep preamble's existing `\newcommand`s even if unused (harmless).
 
-## Length
-- Default: 1 page
-- If overflow, drop the least JD-relevant Projects first, then shorten older Experience entries to 1–2 bullets
-- `preferences.md` may override
+## Length / layout priority
+- **Hard validator gate:** 1-page PDF fit (enforced by `make check`).
+- **Per-bullet length:** target 12–18 words, rewrite/split above 25 — **drafting guidance only, not a `make check` failure.**
+- If overflow, drop the least JD-relevant Projects first, then shorten older Experience entries to 1–2 bullets.
+- `preferences.md` may override.

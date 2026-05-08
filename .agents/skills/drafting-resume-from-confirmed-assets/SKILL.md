@@ -69,11 +69,11 @@ Paths that are NOT under `references/` (e.g. `raw/...`, `jobs/...`, `drafts/...`
 2. Every bullet followed by `% src: <raw/path>[:section]` on the very next line. Unsourced bullets must be deleted.
 3. JD requirement with no supporting evidence in `raw/` → `% TODO: no raw evidence supports <requirement>` at the top (after preamble, before `\begin{document}` body). Do NOT invent.
 4. Selected approved examples inform tone/structure only. Never copy numbers, company names, or specifics from them. If no approved examples are selected in the context file, use only the template and rule files for structure.
-5. Do not upgrade evidence: raw "contributed to X" → bullet cannot say "built X" or "owned X". See `bullet-rules.md` evidence-to-verb mapping.
+5. Do not invent ownership scope. Weak raw phrasing (e.g., "contributed to X") may be upgraded into a concrete engineering action only when **C001 v2** supports it and the candidate can defend the component, design tradeoffs, bugs, and implementation details in interview. See `references/canonical-rules.md` C001 v2 (interview-defensible verb tiers + aggressive-framing rule) and `bullet-rules.md` evidence-to-verb mapping for the conservative baseline.
 6. Output exactly one file: `drafts/<job-slug>.tex`. Overwrite if exists.
 7. Preamble and custom commands from `latex-template.tex` copied verbatim. Only the body (Header + 4 sections) is composed by you.
 8. **About template body:** the body inside `references/latex-template.tex` is a structural example (equivalent to `approved/` entries). Use it for ordering, tone, phrasing. **Never source facts to it.** If a bullet appears in both template body and `raw/`, source to `raw/`. Dates, numbers, and scope claims in the template body may be stale — always defer to `raw/`.
-9. **Page budget (hard):** Output MUST fit on **1 compiled page**. To preserve this, total `\resumeItem` count across all sections ≤ **10**. If projected to overflow: (a) drop the least-JD-relevant PROJECTS entry first, (b) if still overflowing, shorten older Experience roles to 1–2 bullets, (c) if still overflowing, drop PROJECTS entirely. **Never** shrink font, margins, or spacing to "cheat" the page — template sizing is calibrated.
+9. **Page budget (hard):** Output MUST fit on **1 compiled page**. This is the only hard layout rule. **Bullet count is a proxy/guidance, not a hard rule:** prefer **8–10 bullets** for a dense, scannable resume; allow **11–12 bullets** when every bullet adds distinct JD-relevant signal *and* the compiled PDF still fits one page. If projected to overflow: (a) drop the least-JD-relevant PROJECTS entry first, (b) if still overflowing, shorten older Experience roles to 1–2 bullets, (c) if still overflowing, drop PROJECTS entirely. **Never** shrink font, margins, or spacing to "cheat" the page — template sizing is calibrated.
 10. **Projects ordering by JD relevance:** The section order (Header → EDUCATION → EXPERIENCE → PROJECTS → TECHNICAL SKILLS) is fixed. But **within PROJECTS**, order entries by **JD relevance** (most relevant first), not by chronology or alphabet. Include as many PROJECTS entries as fit the bullet budget — 0 is fine if Experience already covers the JD; 2–3 is fine when each adds distinct JD-relevant signal. Each project entry: ≤ 3 bullets.
 11. **Content quality:** A bullet should not merely list tools. It must make an evidence-supported case for engineering credibility: what problem/constraint was handled, what technical action was taken, and what result or validated scope followed.
 12. **No student flavor:** Do not mention grades, "full marks", assignments, class/course labels, or "student project" unless the JD explicitly values academic results or the raw evidence has no better framing. If coursework is used, frame the system, complexity, tests, CI, or validation — not the grade.
@@ -84,7 +84,7 @@ Paths that are NOT under `references/` (e.g. `raw/...`, `jobs/...`, `drafts/...`
 ## Self-check before returning
 - [ ] Every `\resumeItem{...}` has a `% src: ...` on the immediately following line
 - [ ] No `% src:` points to `latex-template.tex`. All facts sourced to `raw/`.
-- [ ] Total `\resumeItem` count ≤ 10 (page-budget proxy)
+- [ ] Total `\resumeItem` count is a guidance proxy: prefer 8–10; up to 11–12 allowed when every bullet adds distinct JD signal and the compiled PDF still fits one page (one-page PDF fit is the only hard layout rule)
 - [ ] PROJECTS entries ordered by JD relevance (most relevant first), not chronology
 - [ ] Section order: Header → EDUCATION → EXPERIENCE → PROJECTS → TECHNICAL SKILLS
 - [ ] Each bullet passes the content-strategy review: problem/constraint, technical action, and supported result/scope are clear
@@ -101,6 +101,15 @@ Paths that are NOT under `references/` (e.g. `raw/...`, `jobs/...`, `drafts/...`
 - [ ] No tech claimed as proficiency that `raw/` only shows as "used"
 - [ ] No unselected `approved/` file or `edits/*/note.md` was read during drafting
 - [ ] TODO block at top for any uncovered JD requirement
+- [ ] **C014** — Bullets follow Action → Outcome → Mechanism shape by default; Mechanism is droppable when not central; Action axis is always present
+- [ ] **C015** — Past tense for completed work, present tense only for genuinely ongoing duties; no tense mixing within a single bullet. **Bullets within an entry are ordered by JD signal first**, not by tense; tense grouping does not override strongest-first ordering.
+- [ ] **C016** — Every bullet starts with a verb; no first-person pronouns ("I", "my"); no passive constructions ("was responsible for", "tasked with", "in charge of", "duties included")
+- [ ] **C018** — Every bullet satisfies at least one of: (a) a defensible concrete number, OR (b) a named subsystem / mechanism / constraint a reviewer can probe. Pure narrative is fail.
+- [ ] **C019** — No self-descriptive adjectives anywhere in the resume (passionate / self-motivated / results-driven / thrive / hard-working / dedicated / detail-oriented / strong skills / proactive / team player, etc.)
+- [ ] **C020** — Domain / platform vocabulary is grounded in at least two of: subsystem, mechanism, constraint/measurement; abstract architecture phrases without specifics are demoted or dropped
+- [ ] **C021** — Each bullet answers "what got better because the candidate did this?"; activity-only bullets are reframed or dropped
+- [ ] **C003 v2** — No "enabling [stakeholder] to [verb]" template phrasing; outcome wording is direct cause-effect or "so [stakeholder] [verb]"
+- [ ] **C017** — Bullet length per bullet 12–18 words target / above 25 rewrite or split (drafting guidance only; one-page PDF fit is the only hard validator)
 - [ ] File ends with `\end{document}`
 
 ## Anti-patterns
@@ -115,9 +124,9 @@ See `references/anti-patterns.md`. LaTeX-specific additions:
 - Print a **preflight checklist** confirming which canonical and personal rules were honored during drafting, e.g.:
   ```
   Preflight applied — Canonical (references/canonical-rules.md):
-  - C001 ownership verbs precise (evidence-matched)
+  - C001 strongest interview-defensible verb tier picked per bullet (Tier 1 / Tier 2; Tier 3 avoided)
   - C002 layer decomposition (where applicable)
-  - C003 user-facing outcome verbs
+  - C003 v2 direct cause-effect outcome wording (no "enabling X to Y" template)
   - C004 internal/public LaTeX separation
   - C005 student-flavor reframed as engineering validation
   - C006 incomplete-project risk-checked
@@ -128,6 +137,14 @@ See `references/anti-patterns.md`. LaTeX-specific additions:
   - C011 bold high-signal items only
   - C012 no keyword stuffing
   - C013 skills JD-filtered
+  - C014 default Action → Outcome → Mechanism bullet shape
+  - C015 tense conventions consistent (present for ongoing, past for completed; no mixing in one bullet)
+  - C016 implied first person, active voice (no "I"; no "was responsible for")
+  - C017 bullet length guidance applied (target 12–18 words; >25 rewrite/split)
+  - C018 specificity OR metric — every bullet has at least one
+  - C019 no self-descriptive adjectives
+  - C020 domain-vocabulary credibility (subsystem + mechanism + constraint, not abstract architecture)
+  - C021 "what got better because the candidate did this?" test passed for every bullet
 
   Preflight applied — Personal (preferences.md):
   - P002/P008 bold carve-outs (≤1–2 bold/bullet, specific bolded items per user taste)

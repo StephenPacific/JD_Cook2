@@ -6,7 +6,9 @@ JD says Kubernetes, no raw source supports it, bullet claims "deployed to K8s".
 
 ## 2. Verb inflation
 Raw says: "contributed to migration". Bullet says: "led migration".
-→ Use "contributed to" or "supported migration of…"
+→ Do not invent leadership. Pick the strongest **interview-defensible** action under C001 v2 instead of falling back to weak verbs. Acceptable upgrades when raw supports the candidate's actual scope: *"validated migration behavior"*, *"tested migration correctness"*, *"integrated migration test coverage"*, *"debugged migration failures"*, *"implemented the migration test harness"*, depending on which component the candidate materially built and can defend.
+
+Avoid Tier-3 fallbacks like *"supported migration of…"* — under C001 v2 *"supported"* is junior-coded. *"Contributed to"* is a fallback, not a default.
 
 ## 3. Number borrowing
 Previous approved resume had "reduced latency 40%". Current draft copies it
